@@ -1,3 +1,4 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
 /// Generated file. Do not edit.
 ///
 /// Source: lib/i18n

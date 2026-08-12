@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -60,6 +63,28 @@ class _CanvasImageDialogState extends State<CanvasImageDialog> {
                   : const Icon(Icons.invert_colors_off),
             ),
           ),
+        ),
+      ),
+      _CanvasImageDialogItem(
+        onTap: widget.image.srcRect.isEmpty
+            ? null
+            : () {
+                final source = widget.image.srcRect;
+                widget.image.cropTo(
+                  Rect.fromLTRB(
+                    source.left + source.width * 0.1,
+                    source.top + source.height * 0.1,
+                    source.right - source.width * 0.1,
+                    source.bottom - source.height * 0.1,
+                  ),
+                );
+                widget.redrawImage();
+                Navigator.of(context).pop();
+              },
+        title: t.editor.imageOptions.crop,
+        child: const AdaptiveIcon(
+          icon: Icons.crop,
+          cupertinoIcon: CupertinoIcons.crop,
         ),
       ),
       _CanvasImageDialogItem(

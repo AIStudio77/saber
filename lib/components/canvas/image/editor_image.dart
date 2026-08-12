@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -44,11 +47,45 @@ sealed class EditorImage extends ChangeNotifier {
 
   int pageIndex;
   void Function(EditorImage, Rect)? onMoveImage;
+  void Function(EditorImage, ImageRectChange)? onCropImage;
   void Function(EditorImage)? onDeleteImage;
   void Function()? onMiscChange;
   final VoidCallback? onLoad;
 
   Rect srcRect = .zero;
+
+  /// Crops the displayed image to [requested] source coordinates.
+  ///
+  /// The original asset is unchanged. The crop is clamped to natural image
+  /// bounds and [dstRect] is scaled to represent the visible source region.
+  void cropTo(Rect requested) {
+    final bounds = Offset.zero & naturalSize;
+    final previousSource = srcRect;
+    final previousDestination = dstRect;
+    final nextSource = requested.intersect(bounds);
+    if (nextSource.isEmpty || previousSource.isEmpty) return;
+
+    final scaleX = previousDestination.width / previousSource.width;
+    final scaleY = previousDestination.height / previousSource.height;
+    srcRect = nextSource;
+    dstRect = Rect.fromLTWH(
+      previousDestination.left +
+          (nextSource.left - previousSource.left) * scaleX,
+      previousDestination.top +
+          (nextSource.top - previousSource.top) * scaleY,
+      nextSource.width * scaleX,
+      nextSource.height * scaleY,
+    );
+    onCropImage?.call(
+      this,
+      ImageRectChange(
+        previousSource: previousSource,
+        currentSource: srcRect,
+        previousDestination: previousDestination,
+        currentDestination: dstRect,
+      ),
+    );
+  }
 
   late var _dstRect = Rect.fromLTWH(
     0,
@@ -269,4 +306,35 @@ sealed class EditorImage extends ChangeNotifier {
 
     return Size(width, height);
   }
+}
+
+/// The source and destination rectangles before and after an image crop.
+class ImageRectChange {
+  /// Creates an immutable crop change.
+  const ImageRectChange({
+    required this.previousSource,
+    required this.currentSource,
+    required this.previousDestination,
+    required this.currentDestination,
+  });
+
+  /// The source rectangle before cropping.
+  final Rect previousSource;
+
+  /// The source rectangle after cropping.
+  final Rect currentSource;
+
+  /// The destination rectangle before cropping.
+  final Rect previousDestination;
+
+  /// The destination rectangle after cropping.
+  final Rect currentDestination;
+
+  /// Returns the same transition in reverse.
+  ImageRectChange reverse() => ImageRectChange(
+    previousSource: currentSource,
+    currentSource: previousSource,
+    previousDestination: currentDestination,
+    currentDestination: previousDestination,
+  );
 }
