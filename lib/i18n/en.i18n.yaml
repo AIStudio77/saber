@@ -1,3 +1,4 @@
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
 common:
   done: Done
   continueBtn: Continue
@@ -272,6 +273,7 @@ editor:
     select: Select
     toggleEraser: Toggle eraser (Ctrl E)
     photo: Images
+    camera: Take photo
     text: Text
     toggleFingerDrawing: Toggle finger drawing (Ctrl F)
     undo: Undo
@@ -318,6 +320,7 @@ editor:
   imageOptions:
     title: Image options
     invertible: Invertible
+    crop: Crop
     download: Download
     setAsBackground: Set as background
     removeAsBackground: Remove as background

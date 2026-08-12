@@ -1,3 +1,4 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
 ///
 /// Generated file. Do not edit.
 ///
@@ -1063,6 +1064,9 @@ class Translations$editor$toolbar$en {
 	/// en: 'Images'
 	String get photo => 'Images';
 
+	/// en: 'Take photo'
+	String get camera => 'Take photo';
+
 	/// en: 'Text'
 	String get text => 'Text';
 
@@ -1224,6 +1228,9 @@ class Translations$editor$imageOptions$en {
 
 	/// en: 'Invertible'
 	String get invertible => 'Invertible';
+
+	/// en: 'Crop'
+	String get crop => 'Crop';
 
 	/// en: 'Download'
 	String get download => 'Download';

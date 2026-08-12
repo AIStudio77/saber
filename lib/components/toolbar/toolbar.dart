@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:io';
 
 import 'package:collapsible/collapsible.dart';
@@ -45,6 +48,8 @@ class Toolbar extends StatefulWidget {
     required this.isRedoPossible,
     required this.toggleFingerDrawing,
     required this.pickPhoto,
+    required this.takePhoto,
+    this.showCameraButton,
     required this.paste,
     required this.duplicateSelection,
     required this.deleteSelection,
@@ -71,6 +76,12 @@ class Toolbar extends StatefulWidget {
   final VoidCallback toggleFingerDrawing;
 
   final VoidCallback pickPhoto;
+
+  /// Launches the native camera to insert a captured photo.
+  final VoidCallback takePhoto;
+
+  /// Overrides Android camera-button visibility, primarily for widget tests.
+  final bool? showCameraButton;
 
   final VoidCallback paste;
 
@@ -466,6 +477,17 @@ class _ToolbarState extends State<Toolbar> {
                   cupertinoIcon: CupertinoIcons.photo,
                 ),
               ),
+              if (widget.showCameraButton ?? Platform.isAndroid)
+                ToolbarIconButton(
+                  tooltip: t.editor.toolbar.camera,
+                  enabled: !widget.readOnly,
+                  onPressed: widget.takePhoto,
+                  padding: buttonPadding,
+                  child: const AdaptiveIcon(
+                    icon: Icons.photo_camera,
+                    cupertinoIcon: CupertinoIcons.camera,
+                  ),
+                ),
               ToolbarIconButton(
                 tooltip: t.editor.toolbar.text,
                 selected: widget.textEditing,

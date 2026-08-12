@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:saber/components/canvas/_stroke.dart';
@@ -149,6 +152,7 @@ class EditorHistoryItem {
     this.quillChange,
     this.colorChange,
     this.backgroundPatternChange,
+    this.imageRectChange,
   }) : assert(
          type != .move || offset != null,
          'Offset must be provided for move',
@@ -176,6 +180,10 @@ class EditorHistoryItem {
        assert(
          type != .backgroundPattern || backgroundPatternChange != null,
          'Background pattern change must be provided for backgroundPattern',
+       ),
+       assert(
+         type != .cropImage || imageRectChange?.isNotEmpty == true,
+         'imageRectChange must be provided for cropImage',
        );
 
   final EditorHistoryItemType type;
@@ -187,6 +195,7 @@ class EditorHistoryItem {
   final DocChange? quillChange;
   final Map<Stroke, Change<Color>>? colorChange;
   final Change<CanvasBackgroundPattern>? backgroundPatternChange;
+  final Map<EditorImage, ImageRectChange>? imageRectChange;
 
   EditorHistoryItem copyWith({
     EditorHistoryItemType? type,
@@ -198,6 +207,7 @@ class EditorHistoryItem {
     DocChange? quillChange,
     Map<Stroke, Change<Color>>? colorChange,
     Change<CanvasBackgroundPattern>? backgroundPatternChange,
+    Map<EditorImage, ImageRectChange>? imageRectChange,
   }) {
     return EditorHistoryItem(
       type: type ?? this.type,
@@ -210,6 +220,7 @@ class EditorHistoryItem {
       colorChange: colorChange ?? this.colorChange,
       backgroundPatternChange:
           backgroundPatternChange ?? this.backgroundPatternChange,
+      imageRectChange: imageRectChange ?? this.imageRectChange,
     );
   }
 }
@@ -224,4 +235,5 @@ enum EditorHistoryItemType {
   quillUndoneChange,
   changeColor,
   backgroundPattern,
+  cropImage,
 }

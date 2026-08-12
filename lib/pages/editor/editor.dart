@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -48,6 +51,7 @@ import 'package:saber/data/tools/pencil.dart';
 import 'package:saber/data/tools/select.dart';
 import 'package:saber/data/tools/shape_pen.dart';
 import 'package:saber/i18n/strings.g.dart';
+import 'package:saber/pages/editor/camera_photo_picker.dart';
 import 'package:saber/pages/home/whiteboard.dart';
 import 'package:sbn/change.dart';
 import 'package:super_clipboard/super_clipboard.dart';
@@ -55,8 +59,16 @@ import 'package:super_clipboard/super_clipboard.dart';
 typedef _PhotoInfo = ({Uint8List bytes, String extension});
 
 class Editor extends StatefulWidget {
-  Editor({super.key, String? path, this.customTitle, this.pdfPath})
-    : initialPath = path != null
+  Editor({
+    super.key,
+    String? path,
+    this.customTitle,
+    this.pdfPath,
+    CameraPhotoPicker? cameraPhotoPicker,
+    bool? cameraSupported,
+  }) : cameraPhotoPicker = cameraPhotoPicker ?? CameraPhotoPicker(),
+       cameraSupported = cameraSupported ?? Platform.isAndroid,
+       initialPath = path != null
           ? Future.value(path)
           : FileManager.newFilePath('/'),
       needsNaming = path == null;
@@ -66,6 +78,12 @@ class Editor extends StatefulWidget {
 
   final String? customTitle;
   final String? pdfPath;
+
+  /// The injectable native-camera acquisition service.
+  final CameraPhotoPicker cameraPhotoPicker;
+
+  /// Whether native camera acquisition is supported on this platform.
+  final bool cameraSupported;
 
   /// The file extension used by the app.
   /// Files with this extension are
@@ -223,10 +241,12 @@ class EditorState extends State<Editor> {
     } else {
       for (final page in coreInfo.pages) {
         page.backgroundImage?.onMoveImage = onMoveImage;
+        page.backgroundImage?.onCropImage = onCropImage;
         page.backgroundImage?.onDeleteImage = onDeleteImage;
         page.backgroundImage?.onMiscChange = autosaveAfterDelay;
         for (final image in page.images) {
           image.onMoveImage = onMoveImage;
+          image.onCropImage = onCropImage;
           image.onDeleteImage = onDeleteImage;
           image.onMiscChange = autosaveAfterDelay;
         }
@@ -434,6 +454,11 @@ class EditorState extends State<Editor> {
 
         case .backgroundPattern:
           coreInfo.backgroundPattern = item.backgroundPatternChange!.previous;
+        case .cropImage:
+          for (final entry in item.imageRectChange!.entries) {
+            entry.key.srcRect = entry.value.previousSource;
+            entry.key.dstRect = entry.value.previousDestination;
+          }
       }
 
       if (item.type != .move) {
@@ -484,6 +509,14 @@ class EditorState extends State<Editor> {
         undo(
           item.copyWith(
             backgroundPatternChange: item.backgroundPatternChange!.reverse(),
+          ),
+        );
+      case .cropImage:
+        undo(
+          item.copyWith(
+            imageRectChange: item.imageRectChange!.map(
+              (image, change) => MapEntry(image, change.reverse()),
+            ),
           ),
         );
     }
@@ -772,6 +805,20 @@ class EditorState extends State<Editor> {
       ),
     );
     // setState to update undo button
+    setState(() {});
+    autosaveAfterDelay();
+  }
+
+  void onCropImage(EditorImage image, ImageRectChange change) {
+    history.recordChange(
+      EditorHistoryItem(
+        type: .cropImage,
+        pageIndex: image.pageIndex,
+        strokes: [],
+        images: [image],
+        imageRectChange: {image: change},
+      ),
+    );
     setState(() {});
     autosaveAfterDelay();
   }
@@ -1112,7 +1159,7 @@ class EditorState extends State<Editor> {
             onMiscChange: autosaveAfterDelay,
             onLoad: () => setState(() {}),
             assetCache: coreInfo.assetCache,
-          )
+          )..onCropImage = onCropImage
         else
           PngEditorImage(
             id: coreInfo.nextImageId++,
@@ -1125,7 +1172,7 @@ class EditorState extends State<Editor> {
             onMiscChange: autosaveAfterDelay,
             onLoad: () => setState(() {}),
             assetCache: coreInfo.assetCache,
-          ),
+          )..onCropImage = onCropImage,
     ];
 
     history.recordChange(
@@ -1141,6 +1188,37 @@ class EditorState extends State<Editor> {
     autosaveAfterDelay();
 
     return images.length;
+  }
+
+  Future<void> _takePhoto() async {
+    if (coreInfo.readOnly || !widget.cameraSupported) return;
+
+    try {
+      final photo = await widget.cameraPhotoPicker.takePhoto();
+      if (photo == null || !mounted) return;
+
+      final count = await _pickPhotos([photo]);
+      if (count == 0 || !mounted) return;
+
+      final pageIndex = currentPageIndex;
+      final image = coreInfo.pages[pageIndex].images.last;
+      final select = Select.currentSelect;
+      select.selectResult = SelectResult(
+        pageIndex: pageIndex,
+        strokes: [],
+        images: [image],
+        path: Path()..addRect(image.dstRect),
+      );
+      select.doneSelecting = true;
+      CanvasImage.activeListener.notifyListenersPlease();
+      setState(() {});
+    } catch (error, stackTrace) {
+      log.severe('Failed to capture camera photo', error, stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
   }
 
   Future<List<_PhotoInfo>> _pickPhotosWithFilePicker() async {
@@ -1457,6 +1535,7 @@ class EditorState extends State<Editor> {
               final duplicatedImages = images.map((image) {
                 return image.copy()
                   ..id = coreInfo.nextImageId++
+                  ..onCropImage = onCropImage
                   ..dstRect.shift(duplicationFeedbackOffset);
               }).toList();
 
@@ -1577,6 +1656,8 @@ class EditorState extends State<Editor> {
             lastSeenPointerCount = 0;
           },
           pickPhoto: _pickPhotos,
+          takePhoto: _takePhoto,
+          showCameraButton: widget.cameraSupported,
           paste: paste,
           exportAsSba: exportAsSba,
           exportAsPdf: exportAsPdf,
