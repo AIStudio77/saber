@@ -1,3 +1,4 @@
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
 name: Run tests
 
 on:
@@ -44,10 +45,14 @@ jobs:
         with:
           flutter-path: submodules/flutter
 
+      - name: Setup Rust
+        uses: moonrepo/setup-rust@v1
+
       - name: Disable Flutter CLI animations
         run: flutter config --no-cli-animations
 
       - run: flutter pub get
+      - run: ./patches/post/patch_rust_versions.sh
 
       - name: Download Apple fonts
         run: dart run golden_screenshot:download_apple_fonts

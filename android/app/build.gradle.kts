@@ -92,7 +92,7 @@ android.applicationVariants.configureEach {
         if (abiVersionCode != null) {
             (output as ApkVariantOutputImpl).versionCodeOverride = variant.versionCode * 10 + abiVersionCode
         }
-        if (buildType.name == "release" && signingProvenance != "official") {
+        if (buildType.name == "release" && signingProvenance != "owner") {
             (output as ApkVariantOutputImpl).outputFileName =
                 output.outputFileName.replace(".apk", "-community-signed.apk")
         }

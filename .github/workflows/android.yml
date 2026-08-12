@@ -192,17 +192,53 @@ jobs:
             submodules/flutter/packages/flutter_tools/gradle/build/
           key: ${{ runner.OS }}-saber_android
 
-      - name: Setup keystore
+      - name: Setup release keystore
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        if: ${{ env.SIGNING_KEY != '' }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
         run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/android.keystore
-          echo "storePassword=${{ secrets.KEY_STORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.ALIAS }}" >> android/key.properties
-          echo "storeFile=../android.keystore" >> android/key.properties
-          echo "signingProvenance=official" >> android/key.properties
+          signing_values=(SIGNING_KEY KEY_STORE_PASSWORD KEY_PASSWORD ALIAS)
+          supplied=0
+          for name in "${signing_values[@]}"; do
+            if [ -n "${!name}" ]; then
+              supplied=$((supplied + 1))
+            fi
+          done
+
+          if [ "$supplied" -ne 0 ] && [ "$supplied" -ne "${#signing_values[@]}" ]; then
+            echo "Configured Android signing secrets must either all be set or all be unset." >&2
+            exit 1
+          fi
+
+          if [ "$supplied" -eq "${#signing_values[@]}" ]; then
+            printf '%s' "$SIGNING_KEY" | base64 --decode > android/android.keystore
+            signing_provenance=owner
+          else
+            KEY_STORE_PASSWORD=$(openssl rand -hex 32)
+            KEY_PASSWORD="$KEY_STORE_PASSWORD"
+            ALIAS=saber-community
+            keytool -genkeypair -noprompt \
+              -keystore android/android.keystore \
+              -storepass "$KEY_STORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -alias "$ALIAS" \
+              -keyalg RSA \
+              -keysize 4096 \
+              -validity 10000 \
+              -dname "CN=Saber Community CI"
+            signing_provenance=community
+          fi
+
+          chmod 600 android/android.keystore
+          {
+            echo "storePassword=$KEY_STORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=$ALIAS"
+            echo "storeFile=../android.keystore"
+            echo "signingProvenance=$signing_provenance"
+          } > android/key.properties
 
       - name: Setup Java
         uses: actions/setup-java@v5.6.0
@@ -245,7 +281,12 @@ jobs:
           echo "apkName=$apkName" >> $GITHUB_OUTPUT
 
           mkdir -p output
-          mv build/app/outputs/flutter-apk/app-release.apk output/$apkName
+          releaseApks=(build/app/outputs/flutter-apk/app-release*.apk)
+          if [ "${#releaseApks[@]}" -ne 1 ] || [ ! -f "${releaseApks[0]}" ]; then
+            echo "Expected exactly one release APK, found ${#releaseApks[@]}." >&2
+            exit 1
+          fi
+          mv "${releaseApks[0]}" "output/$apkName"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
