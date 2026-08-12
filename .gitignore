@@ -1,3 +1,4 @@
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
 # Miscellaneous
 *.class
 *.log
@@ -46,6 +47,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android release signing credentials
+/android/fallback-key.jks
+/android/fallback-key.properties
+/android/key.properties
+/android/*-key.properties
 
 # Flatpak/linux build files
 .flatpak-builder
