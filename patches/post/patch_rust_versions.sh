@@ -1,4 +1,5 @@
 #!/bin/bash
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
 #
 # Our rust dependencies are hardcoded to use the latest `stable` version
 # of Rust. This script patches those dependencies to use the Rust version
@@ -30,10 +31,10 @@ if [ -z "$PUB_CACHE" ]; then
   PUB_CACHE="$HOME/.pub-cache"
 fi
 
-TARGET_FILES=$(find "${PUB_CACHE}/hosted/pub.dev/" -type f -path "*/cargokit/build_tool/lib/src/builder.dart")
+TARGET_FILES=$(find "${PUB_CACHE}" -type f -path "*/cargokit/build_tool/lib/src/builder.dart")
 if [ -z "$TARGET_FILES" ]; then
-  echo "Couldn't find cargokit dependencies. Maybe you haven't run 'flutter pub get' yet?"
-  exit 1
+  echo "No cargokit dependencies found; no Rust version patch is needed."
+  exit 0
 fi
 
 for file in $TARGET_FILES; do
