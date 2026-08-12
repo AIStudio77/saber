@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +26,7 @@ void main() async {
     FlavorConfig.setup();
     await FileManager.init();
 
+    stows.url.value = 'https://nc.saber.adil.hanney.org';
     stows.username.value = 'test.issue.118';
     stows.ncPassword.value = 'riNLA-2fXWY-Kay3x-jEMX5-bZr6m';
     stows.encPassword.value = 'test.issue.118';

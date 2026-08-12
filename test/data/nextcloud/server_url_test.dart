@@ -2,12 +2,15 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:saber/data/flavor_config.dart';
 import 'package:saber/data/nextcloud/nextcloud_client_extension.dart';
 import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/pages/user/login.dart';
 
 void main() {
+  FlavorConfig.setup();
+
   group('parseNextcloudServerUrl', () {
     test('rejects missing and empty configuration', () {
       expect(
