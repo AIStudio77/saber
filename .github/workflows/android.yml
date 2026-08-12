@@ -64,6 +64,12 @@ jobs:
             submodules/flutter/packages/flutter_tools/gradle/build/
           key: ${{ runner.OS }}-saber_android
 
+      - name: Setup Java
+        uses: actions/setup-java@v5.6.0
+        with:
+          distribution: microsoft
+          java-version: "21"
+
       - name: Configure community release signing
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
@@ -78,13 +84,25 @@ jobs:
             fi
           done
 
-          if [ ${#missing[@]} -ne 0 ]; then
-            printf 'Missing required signing secrets: %s\n' "${missing[*]}" >&2
-            exit 1
-          fi
-
           keystore="${RUNNER_TEMP}/saber-community.keystore"
-          printf '%s' "$SIGNING_KEY" | base64 --decode > "$keystore"
+          if [ ${#missing[@]} -eq 0 ]; then
+            printf '%s' "$SIGNING_KEY" | base64 --decode > "$keystore"
+          else
+            echo "Signing secrets are incomplete (${missing[*]}); generating an ephemeral development key."
+            SABER_SIGNING_STORE_PASSWORD=$(openssl rand -hex 24)
+            SABER_SIGNING_KEY_ALIAS=saber-development
+            SABER_SIGNING_KEY_PASSWORD=$SABER_SIGNING_STORE_PASSWORD
+            keytool -genkeypair -noprompt \
+              -keystore "$keystore" \
+              -storepass "$SABER_SIGNING_STORE_PASSWORD" \
+              -alias "$SABER_SIGNING_KEY_ALIAS" \
+              -keypass "$SABER_SIGNING_KEY_PASSWORD" \
+              -storetype PKCS12 \
+              -keyalg RSA \
+              -keysize 4096 \
+              -validity 1 \
+              -dname "CN=Saber Development Build, O=Saber Community"
+          fi
           chmod 600 "$keystore"
           {
             echo "SABER_SIGNING_STORE_FILE=$keystore"
@@ -92,12 +110,6 @@ jobs:
             echo "SABER_SIGNING_KEY_ALIAS=$SABER_SIGNING_KEY_ALIAS"
             echo "SABER_SIGNING_KEY_PASSWORD=$SABER_SIGNING_KEY_PASSWORD"
           } >> "$GITHUB_ENV"
-
-      - name: Setup Java
-        uses: actions/setup-java@v5.6.0
-        with:
-          distribution: microsoft
-          java-version: "21"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
