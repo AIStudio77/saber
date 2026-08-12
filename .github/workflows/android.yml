@@ -1,3 +1,4 @@
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
 name: Build for Android
 
 on:
@@ -14,8 +15,8 @@ on:
 jobs:
   warmup-android-cache:
     # We can't cache the signed builds for security reasons,
-    # so run an unsigned build to populate the cache.
-    name: Build unsigned APK for caching
+    # so run a developer-signed debug build to populate the cache.
+    name: Build debug APK for caching (developer signing)
     runs-on: ubuntu-latest
     # Only run on the main branch to save cache space,
     # since all other branches can use the main branch's cache.
@@ -109,8 +110,8 @@ jobs:
       - run: ./patches/post/patch_rust_versions.sh
         if: ${{ steps.cache.outputs.cache-hit == '' }}
 
-      - name: Build apk
-        run: flutter build apk
+      - name: Build debug apk
+        run: flutter build apk --debug
         if: ${{ steps.cache.outputs.cache-hit == '' }}
 
       - name: Save Android cache
@@ -201,6 +202,7 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ALIAS }}" >> android/key.properties
           echo "storeFile=../android.keystore" >> android/key.properties
+          echo "signingProvenance=official" >> android/key.properties
 
       - name: Setup Java
         uses: actions/setup-java@v5.6.0
