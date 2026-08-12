@@ -1,3 +1,4 @@
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
 name: Build for Linux
 
 on:
@@ -11,6 +12,15 @@ on:
     paths:
       - .github/workflows/linux.yml
       - appimage/AppImageBuilder.yml
+      - assets/**
+      - flatpak/**
+      - lib/**
+      - linux/**
+      - packages/**
+      - patches/**
+      - pubspec.lock
+      - pubspec.yaml
+      - rust-toolchain.toml
 
 jobs:
   build-linux:
@@ -100,6 +110,35 @@ jobs:
         with:
           name: Saber-Archive-${{ matrix.arch.archive-suffix }}
           path: ${{ steps.compress.outputs.archiveName }}
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08
+
+      - name: Build Flatpak bundle
+        id: flatpak
+        run: |
+          rm -rf flatpak/build-input build-dir flatpak-repo
+          cp -R AppDir flatpak/build-input
+          flatpak-builder --user --force-clean --repo=flatpak-repo \
+            build-dir flatpak/com.adilhanney.saber.yml
+
+          buildName=$(grep -oP "(?<=buildName = ').*(?=')" lib/data/version.dart)
+          flatpakName="Saber_v${buildName}_${{ matrix.arch.archive-suffix }}.flatpak"
+          flatpak build-bundle flatpak-repo "$flatpakName" com.adilhanney.saber
+          echo "flatpakName=$flatpakName" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Saber-Flatpak-${{ matrix.arch.archive-suffix }}
+          path: ${{ steps.flatpak.outputs.flatpakName }}
+          if-no-files-found: error
 
       - name: Upload to GitHub release
         uses: svenstaro/upload-release-action@v2
