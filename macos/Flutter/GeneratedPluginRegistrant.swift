@@ -1,4 +1,4 @@
-//
+// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
 //  Generated file. Do not edit.
 //
 
@@ -12,7 +12,6 @@ import file_picker
 import flutter_secure_storage_darwin
 import flutter_web_auth_2
 import irondash_engine_context
-import open_file_mac
 import package_info_plus
 import pdfium_flutter
 import printing
@@ -35,7 +34,6 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterSecureStorageDarwinPlugin.register(with: registry.registrar(forPlugin: "FlutterSecureStorageDarwinPlugin"))
   FlutterWebAuth2Plugin.register(with: registry.registrar(forPlugin: "FlutterWebAuth2Plugin"))
   IrondashEngineContextPlugin.register(with: registry.registrar(forPlugin: "IrondashEngineContextPlugin"))
-  OpenFilePlugin.register(with: registry.registrar(forPlugin: "OpenFilePlugin"))
   FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
   PDFiumFlutterPlugin.register(with: registry.registrar(forPlugin: "PDFiumFlutterPlugin"))
   PrintingPlugin.register(with: registry.registrar(forPlugin: "PrintingPlugin"))

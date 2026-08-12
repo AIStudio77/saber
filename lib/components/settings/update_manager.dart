@@ -1,13 +1,15 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
-import 'package:open_file/open_file.dart';
 import 'package:saber/components/settings/update_dialog.dart';
+import 'package:saber/components/settings/update_installer.dart' as installer;
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/saber_version.dart';
 import 'package:saber/data/version.dart' as version;
@@ -140,7 +142,7 @@ abstract class UpdateManager {
   ]) async {
     platform ??= defaultTargetPlatform;
 
-    if (!UpdateManager.platformFileRegex.containsKey(platform)) return null;
+    if (!supportsDirectInstaller(platform)) return null;
 
     if (apiResponse == null) {
       final http.Response response;
@@ -156,54 +158,91 @@ abstract class UpdateManager {
       apiResponse = response.body;
     }
 
-    final Map<String, dynamic> json = jsonDecode(apiResponse);
+    final decodedResponse = jsonDecode(apiResponse);
+    if (decodedResponse is! Map<String, dynamic>) return null;
+    final assets = decodedResponse['assets'];
+    if (assets is! List) return null;
     final RegExp platformFileRegex = UpdateManager.platformFileRegex[platform]!;
-    final Map<String, dynamic>? asset = (json['assets'] as List).firstWhere(
-      (asset) => platformFileRegex.hasMatch(asset['name']),
-      orElse: () => null,
-    );
-    return asset?['browser_download_url'];
+    for (final asset in assets) {
+      if (asset is! Map<String, dynamic>) continue;
+      final name = asset['name'];
+      if (name is! String || !platformFileRegex.hasMatch(name)) continue;
+      final downloadUrl = asset['browser_download_url'];
+      if (downloadUrl is! String) continue;
+      final uri = Uri.tryParse(downloadUrl);
+      if (uri != null && _isTrustedWindowsInstaller(uri)) {
+        return uri.toString();
+      }
+    }
+    return null;
   }
 
   static final Map<TargetPlatform, RegExp> platformFileRegex = {
     // Normal platforms get their updates from app stores, so
     // manual update handling is only needed for Windows.
-    .windows: RegExp(r'\.exe'),
+    .windows: RegExp(r'\.exe$', caseSensitive: false),
   };
+
+  /// Whether [platform] is permitted to discover a direct installer.
+  @visibleForTesting
+  static bool supportsDirectInstaller(TargetPlatform platform) {
+    assert(
+      platformFileRegex.keys.every((platform) => platform == .windows),
+      'Direct installer patterns must remain Windows-only',
+    );
+    return platform == .windows;
+  }
+
+  /// Whether this process can download and execute a direct installer.
+  static bool get canDirectlyInstall =>
+      defaultTargetPlatform == .windows &&
+      installer.isWindowsInstallerAvailable;
+
+  /// Returns the safe external update destination for a non-Windows platform.
+  static Uri externalUpdateUriFor(
+    TargetPlatform platform, {
+    String appStore = '',
+  }) {
+    if (platform == .linux) {
+      return Uri.parse('https://flathub.org/apps/com.adilhanney.saber');
+    }
+    if (platform == .android && appStore.toLowerCase().contains('google')) {
+      return Uri.parse(
+        'https://play.google.com/store/apps/details?id=com.adilhanney.saber',
+      );
+    }
+    if (platform == .android && appStore.toLowerCase().contains('f-droid')) {
+      return Uri.parse('https://f-droid.org/packages/com.adilhanney.saber/');
+    }
+    return Uri.parse('https://github.com/saber-notes/saber/releases');
+  }
 
   /// Downloads the update file from [downloadUrl] and installs it.
   static Future<void> directlyDownloadUpdate(
     String downloadUrl, {
-    required void Function(TaskStatus)? onStatus,
-    required void Function(double)? onProgress,
+    void Function(double)? onProgress,
   }) async {
-    final fileName = downloadUrl.substring(downloadUrl.lastIndexOf('/') + 1);
-    final task = DownloadTask(
-      url: downloadUrl,
-      filename: fileName,
-      baseDirectory: BaseDirectory.temporary,
-    );
-    await FileDownloader().configure(
-      globalConfig: [
-        (Config.skipExistingFiles, 1),
-        (Config.checkAvailableSpace, 1),
-      ],
-    );
-    final result = await FileDownloader().download(
-      task,
-      onStatus: onStatus,
-      onProgress: onProgress,
-    );
-    if (result.status == TaskStatus.complete) {
-      log.info('Update downloaded successfully: ${result.status}');
-      await OpenFile.open(await task.filePath());
-    } else {
-      log.severe(
-        'Failed to download update from $downloadUrl: '
-        '${result.status} ${result.exception} ${result.responseBody}',
+    if (!canDirectlyInstall) {
+      throw UnsupportedError(
+        'Direct installation is available only on Windows',
       );
     }
+    final uri = Uri.tryParse(downloadUrl);
+    if (uri == null || !_isTrustedWindowsInstaller(uri)) {
+      throw ArgumentError.value(
+        downloadUrl,
+        'downloadUrl',
+        'Untrusted installer',
+      );
+    }
+    await installer.downloadAndInstall(uri, onProgress: onProgress);
   }
+
+  static bool _isTrustedWindowsInstaller(Uri uri) =>
+      uri.scheme == 'https' &&
+      uri.host == 'github.com' &&
+      uri.path.startsWith('/saber-notes/saber/releases/download/') &&
+      uri.path.toLowerCase().endsWith('.exe');
 
   static Future<String?> getChangelog({
     String localeCode = 'en-US',
