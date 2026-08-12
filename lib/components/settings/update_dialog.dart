@@ -1,17 +1,27 @@
-import 'package:background_downloader/background_downloader.dart';
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:saber/components/settings/app_info.dart';
 import 'package:saber/components/settings/update_manager.dart';
 import 'package:saber/components/theming/adaptive_alert_dialog.dart';
 import 'package:saber/components/theming/adaptive_linear_progress_indicator.dart';
+import 'package:saber/data/flavor_config.dart';
 import 'package:saber/data/locales.dart';
 import 'package:saber/i18n/strings.g.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class UpdateDialog extends StatefulWidget {
-  const UpdateDialog({super.key});
+  /// Creates an update dialog.
+  const UpdateDialog({super.key, this.platform, this.loadReleaseData = true});
+
+  /// Overrides the target platform in tests.
+  final TargetPlatform? platform;
+
+  /// Whether release metadata should be loaded.
+  @visibleForTesting
+  final bool loadReleaseData;
 
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
@@ -21,8 +31,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
   String? directDownloadLink;
   var downloadNotAvailableYet = false;
 
-  /// Null if not started yet, or the [TaskStatus] of the download.
-  TaskStatus? directDownloadStatus;
+  var isDownloading = false;
 
   /// Null if not started yet, or the progress (0.0 to 1.0) of the download.
   final directDownloadProgress = ValueNotifier<double?>(null);
@@ -37,7 +46,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.loadReleaseData) _load();
   }
 
   @override
@@ -47,10 +56,13 @@ class _UpdateDialogState extends State<UpdateDialog> {
   }
 
   Future<void> _load() async {
-    directDownloadLink = await UpdateManager.getLatestDownloadUrl();
+    directDownloadLink = await UpdateManager.getLatestDownloadUrl(
+      null,
+      widget.platform,
+    );
     if (!mounted) return;
     downloadNotAvailableYet =
-        UpdateManager.platformFileRegex.containsKey(defaultTargetPlatform) &&
+        UpdateManager.supportsDirectInstaller(_platform) &&
         directDownloadLink == null;
 
     englishChangelog = await UpdateManager.getChangelog();
@@ -63,31 +75,47 @@ class _UpdateDialogState extends State<UpdateDialog> {
     setState(() {});
   }
 
-  bool get _canStartDownload {
+  bool get _canRunUpdateAction {
     if (downloadNotAvailableYet) return false;
-    if (directDownloadStatus?.isNotFinalState ?? false) return false;
+    if (isDownloading) return false;
     return true;
   }
 
-  Future<void> _startDownload() async {
-    if (!_canStartDownload) return;
-    if (directDownloadLink == null) {
-      launchUrl(AppInfo.releasesUrl);
+  TargetPlatform get _platform => widget.platform ?? defaultTargetPlatform;
+
+  bool get _showsDirectInstall =>
+      _platform == .windows && UpdateManager.canDirectlyInstall;
+
+  Uri get _distributionPageUri => UpdateManager.distributionPageUriFor(
+    _platform,
+    appStore: FlavorConfig.appStore,
+  );
+
+  Future<void> _handleUpdateAction() async {
+    if (!_canRunUpdateAction) return;
+    if (_platform == .windows) {
+      await _startWindowsInstaller();
       return;
     }
-    if (!mounted) return;
+    await _openDistributionPage();
+  }
 
+  Future<void> _openDistributionPage() => launchUrl(_distributionPageUri);
+
+  Future<void> _startWindowsInstaller() async {
+    assert(_platform == .windows);
+    if (!_showsDirectInstall) return;
+    final downloadLink = directDownloadLink;
+    if (downloadLink == null || !mounted) return;
+
+    setState(() => isDownloading = true);
     await UpdateManager.directlyDownloadUpdate(
-      directDownloadLink!,
-      onStatus: (status) {
-        directDownloadStatus = status;
-        if (mounted) setState(() {});
-      },
+      downloadLink,
       onProgress: (progress) {
         directDownloadProgress.value = progress;
       },
     );
-    if (mounted) setState(() {});
+    if (mounted) setState(() => isDownloading = false);
   }
 
   @override
@@ -123,16 +151,17 @@ class _UpdateDialogState extends State<UpdateDialog> {
               style: TextStyle(color: ColorScheme.of(context).error),
             ),
 
-          ValueListenableBuilder(
-            valueListenable: directDownloadProgress,
-            builder: (context, progress, _) {
-              if (progress == null) return const SizedBox();
-              return Padding(
-                padding: const .only(top: 16.0),
-                child: AdaptiveLinearProgressIndicator(value: progress),
-              );
-            },
-          ),
+          if (_showsDirectInstall)
+            ValueListenableBuilder(
+              valueListenable: directDownloadProgress,
+              builder: (context, progress, _) {
+                if (progress == null) return const SizedBox();
+                return Padding(
+                  padding: const .only(top: 16.0),
+                  child: AdaptiveLinearProgressIndicator(value: progress),
+                );
+              },
+            ),
         ],
       ),
       actions: [
@@ -143,10 +172,19 @@ class _UpdateDialogState extends State<UpdateDialog> {
           ),
         ),
         CupertinoDialogAction(
-          onPressed: _canStartDownload ? _startDownload : null,
-          child: Text(t.update.update),
+          onPressed: _canRunUpdateAction ? _handleUpdateAction : null,
+          child: Text(_actionLabel),
         ),
       ],
     );
+  }
+
+  String get _actionLabel {
+    if (_showsDirectInstall) return t.update.update;
+    if (_platform == .linux) return 'Flathub';
+    if (_platform == .android && FlavorConfig.appStore.isNotEmpty) {
+      return FlavorConfig.appStore;
+    }
+    return 'Release information';
   }
 }

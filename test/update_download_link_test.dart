@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -45,5 +48,76 @@ void main() {
       );
       expect(url, isNull);
     });
+
+    test('malicious Android response cannot enable an installer', () async {
+      const maliciousResponse = '''
+        {"assets":[{"name":"Saber.exe","browser_download_url":"https://evil.example/Saber.exe"}]}
+      ''';
+      final url = await UpdateManager.getLatestDownloadUrl(
+        maliciousResponse,
+        .android,
+      );
+      expect(url, isNull);
+      expect(UpdateManager.supportsDirectInstaller(.android), isFalse);
+    });
+
+    test('malicious Linux response cannot enable an installer', () async {
+      const maliciousResponse = '''
+        {"assets":[{"name":"Saber.exe","browser_download_url":"https://evil.example/Saber.exe"}]}
+      ''';
+      final url = await UpdateManager.getLatestDownloadUrl(
+        maliciousResponse,
+        .linux,
+      );
+      expect(url, isNull);
+      expect(UpdateManager.supportsDirectInstaller(.linux), isFalse);
+    });
+
+    test(
+      'Windows rejects an executable hosted outside trusted releases',
+      () async {
+        const maliciousResponse = '''
+        {"assets":[{"name":"Saber.exe","browser_download_url":"https://evil.example/Saber.exe"}]}
+      ''';
+        final url = await UpdateManager.getLatestDownloadUrl(
+          maliciousResponse,
+          .windows,
+        );
+        expect(url, isNull);
+      },
+    );
+  });
+
+  test(
+    'direct installation is unavailable on this Linux test process',
+    () async {
+      expect(Platform.isLinux, isTrue);
+      expect(UpdateManager.canDirectlyInstall, isFalse);
+      await expectLater(
+        UpdateManager.directlyDownloadUpdate(
+          'https://github.com/saber-notes/saber/releases/download/v1/Saber.exe',
+        ),
+        throwsUnsupportedError,
+      );
+    },
+  );
+
+  test('Android redirects cannot resolve to executable downloads', () {
+    for (final store in ['', 'Google Play', 'F-Droid']) {
+      final uri = UpdateManager.distributionPageUriFor(
+        .android,
+        appStore: store,
+      );
+      expect(uri.scheme, 'https');
+      expect(uri.path.toLowerCase(), isNot(endsWith('.exe')));
+      expect(uri.path.toLowerCase(), isNot(endsWith('.apk')));
+    }
+  });
+
+  test('Linux redirect resolves only to its distribution channel', () {
+    final uri = UpdateManager.distributionPageUriFor(.linux);
+    expect(uri.host, 'flathub.org');
+    expect(uri.path.toLowerCase(), isNot(endsWith('.exe')));
+    expect(uri.path.toLowerCase(), isNot(endsWith('.appimage')));
   });
 }
