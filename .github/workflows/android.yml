@@ -195,11 +195,16 @@ jobs:
       - name: Setup release keystore
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          ALIAS: ${{ secrets.ALIAS }}
+          SABER_SIGNING_STORE_PASSWORD: ${{ secrets.SABER_SIGNING_STORE_PASSWORD }}
+          SABER_SIGNING_KEY_ALIAS: ${{ secrets.SABER_SIGNING_KEY_ALIAS }}
+          SABER_SIGNING_KEY_PASSWORD: ${{ secrets.SABER_SIGNING_KEY_PASSWORD }}
         run: |
-          signing_values=(SIGNING_KEY KEY_STORE_PASSWORD KEY_PASSWORD ALIAS)
+          signing_values=(
+            SIGNING_KEY
+            SABER_SIGNING_STORE_PASSWORD
+            SABER_SIGNING_KEY_ALIAS
+            SABER_SIGNING_KEY_PASSWORD
+          )
           supplied=0
           for name in "${signing_values[@]}"; do
             if [ -n "${!name}" ]; then
@@ -212,18 +217,19 @@ jobs:
             exit 1
           fi
 
+          keystore="${RUNNER_TEMP}/saber-release.keystore"
           if [ "$supplied" -eq "${#signing_values[@]}" ]; then
-            printf '%s' "$SIGNING_KEY" | base64 --decode > android/android.keystore
+            printf '%s' "$SIGNING_KEY" | base64 --decode > "$keystore"
             signing_provenance=owner
           else
-            KEY_STORE_PASSWORD=$(openssl rand -hex 32)
-            KEY_PASSWORD="$KEY_STORE_PASSWORD"
-            ALIAS=saber-community
+            SABER_SIGNING_STORE_PASSWORD=$(openssl rand -hex 32)
+            SABER_SIGNING_KEY_PASSWORD="$SABER_SIGNING_STORE_PASSWORD"
+            SABER_SIGNING_KEY_ALIAS=saber-community
             keytool -genkeypair -noprompt \
-              -keystore android/android.keystore \
-              -storepass "$KEY_STORE_PASSWORD" \
-              -keypass "$KEY_PASSWORD" \
-              -alias "$ALIAS" \
+              -keystore "$keystore" \
+              -storepass "$SABER_SIGNING_STORE_PASSWORD" \
+              -keypass "$SABER_SIGNING_KEY_PASSWORD" \
+              -alias "$SABER_SIGNING_KEY_ALIAS" \
               -keyalg RSA \
               -keysize 4096 \
               -validity 10000 \
@@ -231,14 +237,14 @@ jobs:
             signing_provenance=community
           fi
 
-          chmod 600 android/android.keystore
+          chmod 600 "$keystore"
           {
-            echo "storePassword=$KEY_STORE_PASSWORD"
-            echo "keyPassword=$KEY_PASSWORD"
-            echo "keyAlias=$ALIAS"
-            echo "storeFile=../android.keystore"
-            echo "signingProvenance=$signing_provenance"
-          } > android/key.properties
+            echo "SABER_SIGNING_STORE_FILE=$keystore"
+            echo "SABER_SIGNING_STORE_PASSWORD=$SABER_SIGNING_STORE_PASSWORD"
+            echo "SABER_SIGNING_KEY_ALIAS=$SABER_SIGNING_KEY_ALIAS"
+            echo "SABER_SIGNING_KEY_PASSWORD=$SABER_SIGNING_KEY_PASSWORD"
+            echo "SABER_SIGNING_PROVENANCE=$signing_provenance"
+          } >> "$GITHUB_ENV"
 
       - name: Setup Java
         uses: actions/setup-java@v5.6.0
