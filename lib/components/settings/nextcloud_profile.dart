@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -9,6 +12,7 @@ import 'package:saber/data/extensions/quota_extension.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/nextcloud/nextcloud_client_extension.dart';
 import 'package:saber/data/nextcloud/saber_syncer.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/routes.dart';
 import 'package:saber/i18n/strings.g.dart';
@@ -91,11 +95,15 @@ class NextcloudProfile extends HookWidget {
   static Future<Quota?> getStorageQuota() async {
     if (forceLoginStep != null) return stows.lastStorageQuota.value;
 
-    final client = NextcloudClientExtension.withSavedDetails();
-    if (client == null) return stows.lastStorageQuota.value = null;
+    try {
+      final client = NextcloudClientExtension.withSavedDetails();
+      if (client == null) return stows.lastStorageQuota.value = null;
 
-    final user = await client.provisioningApi.users.getCurrentUser();
-    return stows.lastStorageQuota.value = user.body.ocs.data.quota;
+      final user = await client.provisioningApi.users.getCurrentUser();
+      return stows.lastStorageQuota.value = user.body.ocs.data.quota;
+    } on NextcloudConfigurationException {
+      return stows.lastStorageQuota.value = null;
+    }
   }
 }
 

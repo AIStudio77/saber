@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -8,6 +11,7 @@ import 'package:nextcloud/core.dart';
 import 'package:nextcloud/nextcloud.dart';
 import 'package:saber/data/nextcloud/nc_http_overrides.dart';
 import 'package:saber/data/nextcloud/nextcloud_client_extension.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SaberLoginFlow {
@@ -69,6 +73,7 @@ class SaberLoginFlow {
           );
 
           _pollTimer?.cancel();
+          parseNextcloudServerUrl(poll.body.server);
           if (!completer.isCompleted) completer.complete(poll.body);
         }),
       );
@@ -88,6 +93,10 @@ class SaberLoginFlow {
   Future<T?> _catch404Error<T>(Future<T> Function() fn) async {
     try {
       return await fn();
+    } on NextcloudConfigurationException catch (error, stackTrace) {
+      _pollTimer?.cancel();
+      if (!completer.isCompleted) completer.completeError(error, stackTrace);
+      return null;
     } on DynamiteStatusCodeException catch (error) {
       if (error.statusCode != 404) rethrow;
 

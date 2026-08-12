@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:saber/components/nextcloud/done_login_step.dart';
@@ -5,6 +8,7 @@ import 'package:saber/components/nextcloud/enc_login_step.dart';
 import 'package:saber/components/nextcloud/nc_login_step.dart';
 import 'package:saber/components/theming/adaptive_circular_progress_indicator.dart';
 import 'package:saber/components/theming/adaptive_linear_progress_indicator.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/i18n/strings.g.dart';
 
@@ -21,10 +25,6 @@ class NcLoginPage extends StatefulWidget {
   /// If provided, forces the current step to this value (for testing)
   final LoginStep? forceCurrentStep;
 
-  static final Uri signupUrl = Uri.parse(
-    'https://nc.saber.adil.hanney.org/index.php/apps/registration/',
-  );
-
   @override
   State<NcLoginPage> createState() => _NcLoginPageState();
 
@@ -38,7 +38,9 @@ class NcLoginPage extends StatefulWidget {
       return .waitingForPrefs;
     }
 
-    if (stows.username.value.isEmpty || stows.ncPassword.value.isEmpty) {
+    if (!isValidNextcloudServerUrl(stows.url.value) ||
+        stows.username.value.isEmpty ||
+        stows.ncPassword.value.isEmpty) {
       return .nc;
     }
     if (stows.encPassword.value.isEmpty ||

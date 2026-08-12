@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +14,7 @@ import 'package:nextcloud/webdav.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/nextcloud/errors.dart';
 import 'package:saber/data/nextcloud/nextcloud_client_extension.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/pages/editor/editor.dart';
 import 'package:worker_manager/worker_manager.dart';
@@ -312,7 +316,11 @@ class SaberSyncInterface
   static NextcloudClient? _client;
   static NextcloudClient? get client {
     if (_client?.authentications?.isEmpty ?? true) {
-      _client = NextcloudClientExtension.withSavedDetails();
+      try {
+        _client = NextcloudClientExtension.withSavedDetails();
+      } on NextcloudConfigurationException {
+        _client = null;
+      }
     }
     return _client;
   }

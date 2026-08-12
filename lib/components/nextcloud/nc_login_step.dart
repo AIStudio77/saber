@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:async';
 import 'dart:math';
 
@@ -7,14 +10,13 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:nextcloud/core.dart';
 import 'package:nextcloud/nextcloud.dart';
-import 'package:regexed_validator/regexed_validator.dart';
 import 'package:saber/components/settings/app_info.dart';
 import 'package:saber/components/theming/adaptive_circular_progress_indicator.dart';
 import 'package:saber/data/nextcloud/login_flow.dart';
 import 'package:saber/data/nextcloud/nextcloud_client_extension.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/i18n/strings.g.dart';
-import 'package:saber/pages/user/login.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class NcLoginStep extends StatefulHookWidget {
@@ -29,10 +31,6 @@ class NcLoginStep extends StatefulHookWidget {
 class _NcLoginStepState extends State<NcLoginStep> {
   static const width = 400.0;
 
-  /// Lighter than the actual Saber color for better contrast
-  static const saberColor = Color(0xFFffd642);
-  static const onSaberColor = Colors.black;
-  static const saberColorDarkened = Color(0xFFc29800);
   static const ncColor = Color(0xFF0082c9);
 
   SaberLoginFlow _createLoginFlow(Uri serverUrl) {
@@ -43,46 +41,42 @@ class _NcLoginStepState extends State<NcLoginStep> {
       builder: (context) => _LoginFlowDialog(loginFlow: loginFlow),
     );
 
-    loginFlow.future.then((credentials) async {
-      final client = NextcloudClient(
-        Uri.parse(credentials.server),
-        loginName: credentials.loginName,
-        appPassword: credentials.appPassword,
-        httpClient: NextcloudClientExtension.newHttpClient(),
-      );
-      final username = await client.getUsername();
+    loginFlow.future.then(
+      (credentials) async {
+        final serverUri = parseNextcloudServerUrl(credentials.server);
+        final client = NextcloudClient(
+          serverUri,
+          loginName: credentials.loginName,
+          appPassword: credentials.appPassword,
+          httpClient: NextcloudClientExtension.newHttpClient(),
+        );
+        final username = await client.getUsername();
 
-      stows.url.value =
-          credentials.server ==
-              NextcloudClientExtension.defaultNextcloudUri.toString()
-          ? ''
-          : credentials.server;
-      stows.username.value = username;
-      stows.ncPassword.value = credentials.appPassword;
-      stows.encPassword.value = '';
+        stows.url.value = serverUri.toString();
+        stows.username.value = username;
+        stows.ncPassword.value = credentials.appPassword;
+        stows.encPassword.value = '';
 
-      stows.pfp.value = null;
-      client.core.avatar
-          .getAvatar(userId: username, size: AvatarGetAvatarSize.$512)
-          .then((response) => response.body)
-          .then((pfp) => stows.pfp.value = pfp);
+        stows.pfp.value = null;
+        client.core.avatar
+            .getAvatar(userId: username, size: AvatarGetAvatarSize.$512)
+            .then((response) => response.body)
+            .then((pfp) => stows.pfp.value = pfp);
 
-      widget.recheckCurrentStep();
-    });
+        widget.recheckCurrentStep();
+      },
+      onError: (Object _, StackTrace _) {},
+    );
 
     return loginFlow;
   }
-
-  static String _prependHttpsIfMissing(String url) =>
-      url.startsWith(RegExp(r'https?://')) ? url : 'https://$url';
 
   @override
   Widget build(BuildContext context) {
     final serverUrlController = useTextEditingController();
 
     final isServerUrlValid = useListenableSelector(serverUrlController, () {
-      final url = _prependHttpsIfMissing(serverUrlController.text);
-      return validator.url(url);
+      return isValidNextcloudServerUrl(serverUrlController.text);
     });
 
     final loginFlow = useState<SaberLoginFlow?>(null);
@@ -129,45 +123,6 @@ class _NcLoginStepState extends State<NcLoginStep> {
         Row(
           mainAxisAlignment: .end,
           children: [
-            SvgPicture.asset('assets/icon/icon.svg', width: 32, height: 32),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                t.login.ncLoginStep.saberNcServer,
-                style: textTheme.headlineSmall,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: () => loginFlow.value = _createLoginFlow(
-            NextcloudClientExtension.defaultNextcloudUri,
-          ),
-          style: buttonColorStyle(saberColor, onSaberColor),
-          child: Text(t.login.ncLoginStep.loginWithSaber),
-        ),
-        const SizedBox(height: 4),
-        Text.rich(
-          t.login.signup(
-            linkToSignup: (text) => TextSpan(
-              text: text,
-              style: TextStyle(
-                color: colorScheme.brightness == .dark
-                    ? saberColor
-                    : saberColorDarkened,
-              ),
-              recognizer: TapGestureRecognizer()
-                ..onTap = () {
-                  launchUrl(NcLoginPage.signupUrl);
-                },
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        Row(
-          mainAxisAlignment: .end,
-          children: [
             SvgPicture.asset(
               'assets/images/nextcloud-logo.svg',
               width: 32,
@@ -196,11 +151,8 @@ class _NcLoginStepState extends State<NcLoginStep> {
         ElevatedButton(
           onPressed: isServerUrlValid
               ? () {
-                  serverUrlController.text = _prependHttpsIfMissing(
-                    serverUrlController.text,
-                  );
                   loginFlow.value = _createLoginFlow(
-                    Uri.parse(serverUrlController.text),
+                    parseNextcloudServerUrl(serverUrlController.text),
                   );
                 }
               : null,
@@ -238,10 +190,16 @@ class _LoginFlowDialogState extends State<_LoginFlowDialog> {
   @override
   void initState() {
     super.initState();
-    widget.loginFlow.future.then((_) {
-      if (!mounted) return;
-      Navigator.of(context).pop();
-    });
+    widget.loginFlow.future.then(
+      (_) {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+      },
+      onError: (Object _, StackTrace _) {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+      },
+    );
   }
 
   @override
