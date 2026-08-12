@@ -1,0 +1,26 @@
+# 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
+app-id: com.adilhanney.saber
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+command: saber
+
+finish-args:
+  - --device=dri
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --socket=wayland
+
+modules:
+  - name: saber
+    buildsystem: simple
+    build-commands:
+      - install -d /app/bin /app/share
+      - cp -a . /app/bin/
+      - mv /app/bin/share/* /app/share/
+      - rmdir /app/bin/share
+    sources:
+      - type: dir
+        path: build-input
