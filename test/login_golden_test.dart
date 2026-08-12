@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_screenshot/golden_screenshot.dart';
@@ -20,6 +23,7 @@ void main() {
         .light,
         _device.platform,
       );
+      stows.url.value = 'https://cloud.example.com';
       stows.username.value = 'testuser';
       stows.ncPassword.value = 'testpassword';
       stows.encPassword.value = 'encpassword';

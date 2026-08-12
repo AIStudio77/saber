@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -10,14 +13,11 @@ import 'package:nextcloud/provisioning_api.dart';
 import 'package:nextcloud/webdav.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/nextcloud/errors.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/version.dart';
 
 extension NextcloudClientExtension on NextcloudClient {
-  static final Uri defaultNextcloudUri = Uri.parse(
-    'https://nc.saber.adil.hanney.org',
-  );
-
   static final userAgent =
       'Saber/$buildName '
       '(${Platform.operatingSystem}) '
@@ -37,14 +37,18 @@ extension NextcloudClientExtension on NextcloudClient {
   static const reproducibleSalt = r'8MnPs64@R&mF8XjWeLrD';
 
   static NextcloudClient? withSavedDetails() {
-    if (!stows.loggedIn) return null;
+    if (stows.username.value.isEmpty ||
+        stows.ncPassword.value.isEmpty ||
+        stows.encPassword.value.isEmpty) {
+      return null;
+    }
 
-    final url = stows.url.value;
+    final url = parseNextcloudServerUrl(stows.url.value);
     final username = stows.username.value;
     final ncPassword = stows.ncPassword.value;
 
     final client = NextcloudClient(
-      url.isNotEmpty ? Uri.parse(url) : defaultNextcloudUri,
+      url,
       loginName: username,
       password: ncPassword,
       appPassword: ncPassword,

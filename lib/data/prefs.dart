@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -12,6 +15,7 @@ import 'package:saber/components/settings/nextcloud_profile.dart';
 import 'package:saber/data/codecs/base64_codec.dart';
 import 'package:saber/data/codecs/quota_codec.dart';
 import 'package:saber/data/flavor_config.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/sentry/sentry_consent.dart';
 import 'package:saber/data/tools/highlighter.dart';
 import 'package:saber/data/tools/pen.dart';
@@ -73,6 +77,7 @@ class Stows {
   /// Whether the user is logged in and has provided both passwords.
   /// Please ensure that the relevant Prefs are loaded before using this.
   bool get loggedIn =>
+      isValidNextcloudServerUrl(url.value) &&
       username.value.isNotEmpty &&
       ncPassword.value.isNotEmpty &&
       encPassword.value.isNotEmpty;

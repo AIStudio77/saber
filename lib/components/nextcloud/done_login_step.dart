@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -5,8 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:logging/logging.dart';
 import 'package:saber/components/misc/faq.dart';
 import 'package:saber/data/extensions/quota_extension.dart';
-import 'package:saber/data/extensions/string_extensions.dart';
-import 'package:saber/data/nextcloud/nextcloud_client_extension.dart';
+import 'package:saber/data/nextcloud/server_url.dart';
 import 'package:saber/data/nextcloud/readable_bytes.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/i18n/strings.g.dart';
@@ -39,11 +41,8 @@ class DoneLoginStep extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final quota = stows.lastStorageQuota.value;
-    final serverName =
-        stows.url.value.ifNotEmpty ?? t.login.ncLoginStep.saberNcServer;
-    late final serverUri = stows.url.value.isEmpty
-        ? NextcloudClientExtension.defaultNextcloudUri
-        : Uri.parse(stows.url.value);
+    final serverName = stows.url.value;
+    final serverUri = parseNextcloudServerUrl(serverName);
     return ListView(
       padding: .symmetric(
         horizontal: screenWidth > width ? (screenWidth - width) / 2 : 16,
@@ -63,10 +62,7 @@ class DoneLoginStep extends StatelessWidget {
         Row(
           children: [
             if (stows.pfp.value == null)
-              if (stows.url.value.isEmpty)
-                SvgPicture.asset('assets/icon/icon.svg', width: 32, height: 32)
-              else
-                const Icon(Icons.account_circle, size: 32)
+              const Icon(Icons.account_circle, size: 32)
             else
               Image.memory(stows.pfp.value!, width: 32, height: 32),
             const SizedBox(width: 16),
