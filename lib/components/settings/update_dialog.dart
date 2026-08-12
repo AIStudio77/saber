@@ -75,7 +75,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     setState(() {});
   }
 
-  bool get _canStartDownload {
+  bool get _canRunUpdateAction {
     if (downloadNotAvailableYet) return false;
     if (isDownloading) return false;
     return true;
@@ -86,22 +86,31 @@ class _UpdateDialogState extends State<UpdateDialog> {
   bool get _showsDirectInstall =>
       _platform == .windows && UpdateManager.canDirectlyInstall;
 
-  Uri get _externalUpdateUri => UpdateManager.externalUpdateUriFor(
+  Uri get _distributionPageUri => UpdateManager.distributionPageUriFor(
     _platform,
     appStore: FlavorConfig.appStore,
   );
 
-  Future<void> _startDownload() async {
-    if (!_canStartDownload) return;
-    if (!_showsDirectInstall || directDownloadLink == null) {
-      launchUrl(_externalUpdateUri);
+  Future<void> _handleUpdateAction() async {
+    if (!_canRunUpdateAction) return;
+    if (_platform == .windows) {
+      await _startWindowsInstaller();
       return;
     }
-    if (!mounted) return;
+    await _openDistributionPage();
+  }
+
+  Future<void> _openDistributionPage() => launchUrl(_distributionPageUri);
+
+  Future<void> _startWindowsInstaller() async {
+    assert(_platform == .windows);
+    if (!_showsDirectInstall) return;
+    final downloadLink = directDownloadLink;
+    if (downloadLink == null || !mounted) return;
 
     setState(() => isDownloading = true);
     await UpdateManager.directlyDownloadUpdate(
-      directDownloadLink!,
+      downloadLink,
       onProgress: (progress) {
         directDownloadProgress.value = progress;
       },
@@ -163,7 +172,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
           ),
         ),
         CupertinoDialogAction(
-          onPressed: _canStartDownload ? _startDownload : null,
+          onPressed: _canRunUpdateAction ? _handleUpdateAction : null,
           child: Text(_actionLabel),
         ),
       ],

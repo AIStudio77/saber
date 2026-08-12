@@ -198,11 +198,13 @@ abstract class UpdateManager {
       defaultTargetPlatform == .windows &&
       installer.isWindowsInstallerAvailable;
 
-  /// Returns the safe external update destination for a non-Windows platform.
-  static Uri externalUpdateUriFor(
+  /// Returns the store, package channel, or release-information page for a
+  /// platform that does not support direct installation.
+  static Uri distributionPageUriFor(
     TargetPlatform platform, {
     String appStore = '',
   }) {
+    assert(platform != .windows, 'Windows uses its direct installer');
     if (platform == .linux) {
       return Uri.parse('https://flathub.org/apps/com.adilhanney.saber');
     }

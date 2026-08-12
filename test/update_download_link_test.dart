@@ -104,7 +104,7 @@ void main() {
 
   test('Android redirects cannot resolve to executable downloads', () {
     for (final store in ['', 'Google Play', 'F-Droid']) {
-      final uri = UpdateManager.externalUpdateUriFor(
+      final uri = UpdateManager.distributionPageUriFor(
         .android,
         appStore: store,
       );
@@ -115,7 +115,7 @@ void main() {
   });
 
   test('Linux redirect resolves only to its distribution channel', () {
-    final uri = UpdateManager.externalUpdateUriFor(.linux);
+    final uri = UpdateManager.distributionPageUriFor(.linux);
     expect(uri.host, 'flathub.org');
     expect(uri.path.toLowerCase(), isNot(endsWith('.exe')));
     expect(uri.path.toLowerCase(), isNot(endsWith('.appimage')));
