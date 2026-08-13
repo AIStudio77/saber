@@ -76,7 +76,24 @@ void main() {
     expect(strokes.first.pointVectors.last.x, closeTo(40, 0.001));
     expect(strokes.last.pointVectors.first.x, closeTo(60, 0.001));
     expect(result.erasedStrokes, hasLength(1));
+    expect(result.erasedStrokes.single, same(stroke));
     expect(result.replacementStrokes, hasLength(2));
+  });
+
+  test('repeated erasing keeps both surviving sides of a stroke', () {
+    final eraser = Eraser(size: 5);
+    final stroke = _strokeWithPoint(const Offset(50, 0))
+      ..addPoint(const Offset(50, 100));
+    final strokes = [stroke];
+
+    for (var x = 0.0; x <= 100; x += 2.5) {
+      eraser.checkForOverlappingStrokes(Offset(x, 50), strokes);
+    }
+    final result = eraser.onDragEnd();
+
+    expect(strokes, hasLength(2));
+    expect(result.erasedStrokes.single, same(stroke));
+    expect(result.replacementStrokes, unorderedEquals(strokes));
   });
 
   test('fast eraser movement clears the complete swept path', () {

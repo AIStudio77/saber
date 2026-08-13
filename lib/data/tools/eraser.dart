@@ -50,7 +50,7 @@ class Eraser extends Tool {
     final distance = (eraserPos - from).distance;
     final stepLength = max(size * 0.5, 0.5);
     final steps = max(1, (distance / stepLength).ceil());
-    for (var step = 0; step <= steps; step++) {
+    for (var step = 1; step <= steps; step++) {
       final position = Offset.lerp(from, eraserPos, step / steps)!;
       _eraseAt(position, strokes);
     }
@@ -76,11 +76,11 @@ class Eraser extends Tool {
       final segments = _remainingSegments(stroke, position, size);
       if (segments == null) continue;
 
-      if (!_replacementStrokes.remove(stroke)) _erased.add(stroke.copy());
+      if (!_replacementStrokes.remove(stroke)) _erased.add(stroke);
       strokes.removeAt(index);
 
       final replacements = segments
-          .where((segment) => segment.isNotEmpty)
+          .where((segment) => segment.length > 1)
           .map((segment) => _strokeFromSegment(stroke, segment))
           .toList();
       strokes.insertAll(index, replacements);
