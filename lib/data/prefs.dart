@@ -247,6 +247,11 @@ class Stows {
     codec: ToolId.codec,
     volatile: !_isOnMainIsolate,
   );
+  final lastEraserSize = PlainStow(
+    'lastEraserSize',
+    5.0,
+    volatile: !_isOnMainIsolate,
+  );
   static StrokeOptions _strokeOptionsFromJson(Object json) =>
       StrokeOptions.fromJson(json as Map<String, dynamic>);
   final lastFountainPenOptions = PlainStow.json(

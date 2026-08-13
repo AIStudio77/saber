@@ -162,7 +162,7 @@ class EditorState extends State<Editor> {
       case .pencil:
         return Pencil.currentPencil;
       case .eraser:
-        return Eraser();
+        return Eraser.currentEraser;
       case .select:
         return Select.currentSelect;
       case .textEditing:
@@ -387,6 +387,9 @@ class EditorState extends State<Editor> {
           removeExcessPages();
 
         case .erase:
+          for (final stroke in item.replacementStrokes) {
+            coreInfo.pages[stroke.pageIndex].strokes.remove(stroke);
+          }
           for (final stroke in item.strokes) {
             createPage(stroke.pageIndex);
             coreInfo.pages[stroke.pageIndex].insertStroke(stroke);
@@ -477,7 +480,14 @@ class EditorState extends State<Editor> {
       case .draw:
         undo(item.copyWith(type: .erase));
       case .erase:
-        undo(item.copyWith(type: .draw));
+        for (final stroke in item.strokes) {
+          coreInfo.pages[stroke.pageIndex].strokes.remove(stroke);
+        }
+        for (final stroke in item.replacementStrokes) {
+          createPage(stroke.pageIndex);
+          coreInfo.pages[stroke.pageIndex].insertStroke(stroke);
+        }
+        autosaveAfterDelay();
       case .deletePage:
         undo(item.copyWith(type: .insertPage));
       case .insertPage:
@@ -698,19 +708,20 @@ class EditorState extends State<Editor> {
           ),
         );
       } else if (currentTool is Eraser) {
-        final erased = (currentTool as Eraser).onDragEnd();
+        final eraserResult = (currentTool as Eraser).onDragEnd();
         if (stylusButtonWasPressed || stows.disableEraserAfterUse.value) {
           // restore previous tool
           stylusButtonWasPressed = false;
           currentTool = _lastNonEraserTool;
         }
-        if (erased.isEmpty) return;
+        if (eraserResult.erasedStrokes.isEmpty) return;
         history.recordChange(
           EditorHistoryItem(
             type: .erase,
             pageIndex: dragPageIndex!,
-            strokes: erased,
+            strokes: eraserResult.erasedStrokes,
             images: [],
+            replacementStrokes: eraserResult.replacementStrokes,
           ),
         );
       } else if (currentTool is Select) {
@@ -782,7 +793,7 @@ class EditorState extends State<Editor> {
     if (buttonIsPressed) {
       // button pressed while hovering, switch to Eraser
       if (currentTool is! Eraser) {
-        currentTool = Eraser();
+        currentTool = Eraser.currentEraser;
       }
     } else {
       // button was released while hovering, switch back to non-Eraser
