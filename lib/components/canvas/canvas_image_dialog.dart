@@ -46,6 +46,21 @@ class _CanvasImageDialogState extends State<CanvasImageDialog> {
     widget.redrawImage();
   });
 
+  Future<void> showCropDialog() async {
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await showDialog<void>(
+      context: navigator.context,
+      builder: (context) => _ImageCropDialog(
+        image: widget.image,
+        onApply: (crop) {
+          widget.image.cropTo(crop);
+          widget.redrawImage();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final platform = Theme.of(context).platform;
@@ -68,19 +83,7 @@ class _CanvasImageDialogState extends State<CanvasImageDialog> {
       _CanvasImageDialogItem(
         onTap: widget.image.srcRect.isEmpty
             ? null
-            : () {
-                final source = widget.image.srcRect;
-                widget.image.cropTo(
-                  Rect.fromLTRB(
-                    source.left + source.width * 0.1,
-                    source.top + source.height * 0.1,
-                    source.right - source.width * 0.1,
-                    source.bottom - source.height * 0.1,
-                  ),
-                );
-                widget.redrawImage();
-                Navigator.of(context).pop();
-              },
+            : showCropDialog,
         title: t.editor.imageOptions.crop,
         child: const AdaptiveIcon(
           icon: Icons.crop,
@@ -191,6 +194,202 @@ class _CanvasImageDialogState extends State<CanvasImageDialog> {
       return SizedBox(width: 250, child: gridView);
     }
   }
+}
+
+class _ImageCropDialog extends StatefulWidget {
+  const _ImageCropDialog({required this.image, required this.onApply});
+
+  final EditorImage image;
+  final ValueChanged<Rect> onApply;
+
+  @override
+  State<_ImageCropDialog> createState() => _ImageCropDialogState();
+}
+
+class _ImageCropDialogState extends State<_ImageCropDialog> {
+  static const minimumCropSize = 1.0;
+
+  late Rect crop;
+  Rect dragStartCrop = .zero;
+  Offset dragStart = .zero;
+  _CropDragMode dragMode = .none;
+
+  @override
+  void initState() {
+    super.initState();
+    crop = widget.image.srcRect;
+  }
+
+  void startDrag(DragStartDetails details, Size previewSize) {
+    dragStart = _toSource(details.localPosition, previewSize);
+    dragStartCrop = crop;
+    final tolerance = 24 * widget.image.naturalSize.width / previewSize.width;
+    final point = dragStart;
+    final nearLeft = (point.dx - crop.left).abs() <= tolerance;
+    final nearRight = (point.dx - crop.right).abs() <= tolerance;
+    final nearTop = (point.dy - crop.top).abs() <= tolerance;
+    final nearBottom = (point.dy - crop.bottom).abs() <= tolerance;
+    dragMode = switch ((nearLeft, nearRight, nearTop, nearBottom)) {
+      (true, _, true, _) => .topLeft,
+      (_, true, true, _) => .topRight,
+      (true, _, _, true) => .bottomLeft,
+      (_, true, _, true) => .bottomRight,
+      _ when crop.contains(point) => .move,
+      _ => .none,
+    };
+  }
+
+  void updateDrag(DragUpdateDetails details, Size previewSize) {
+    if (dragMode == .none) return;
+    final delta = _toSource(details.localPosition, previewSize) - dragStart;
+    final bounds = Offset.zero & widget.image.naturalSize;
+    Rect next = switch (dragMode) {
+      .topLeft => Rect.fromLTRB(
+        dragStartCrop.left + delta.dx,
+        dragStartCrop.top + delta.dy,
+        dragStartCrop.right,
+        dragStartCrop.bottom,
+      ),
+      .topRight => Rect.fromLTRB(
+        dragStartCrop.left,
+        dragStartCrop.top + delta.dy,
+        dragStartCrop.right + delta.dx,
+        dragStartCrop.bottom,
+      ),
+      .bottomLeft => Rect.fromLTRB(
+        dragStartCrop.left + delta.dx,
+        dragStartCrop.top,
+        dragStartCrop.right,
+        dragStartCrop.bottom + delta.dy,
+      ),
+      .bottomRight => Rect.fromLTRB(
+        dragStartCrop.left,
+        dragStartCrop.top,
+        dragStartCrop.right + delta.dx,
+        dragStartCrop.bottom + delta.dy,
+      ),
+      .move => dragStartCrop.shift(delta),
+      .none => dragStartCrop,
+    };
+    if (dragMode == .move) {
+      next = next.shift(Offset(
+        next.left < bounds.left
+            ? bounds.left - next.left
+            : next.right > bounds.right
+            ? bounds.right - next.right
+            : 0,
+        next.top < bounds.top
+            ? bounds.top - next.top
+            : next.bottom > bounds.bottom
+            ? bounds.bottom - next.bottom
+            : 0,
+      ));
+    } else {
+      next = next.intersect(bounds);
+      if (next.width < minimumCropSize || next.height < minimumCropSize) return;
+    }
+    setState(() => crop = next);
+  }
+
+  Offset _toSource(Offset point, Size previewSize) => Offset(
+    point.dx * widget.image.naturalSize.width / previewSize.width,
+    point.dy * widget.image.naturalSize.height / previewSize.height,
+  );
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(t.editor.imageOptions.crop),
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 600, maxHeight: 600),
+      child: AspectRatio(
+        aspectRatio: widget.image.naturalSize.aspectRatio,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final previewSize = constraints.biggest;
+            return GestureDetector(
+              key: const Key('imageCropPreview'),
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (details) => startDrag(details, previewSize),
+              onPanUpdate: (details) => updateDrag(details, previewSize),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  widget.image.buildImageWidget(
+                    context: context,
+                    overrideBoxFit: BoxFit.fill,
+                    isBackground: false,
+                    invert: false,
+                  ),
+                  CustomPaint(
+                    painter: _CropOverlayPainter(
+                      Rect.fromLTRB(
+                        crop.left * previewSize.width /
+                            widget.image.naturalSize.width,
+                        crop.top * previewSize.height /
+                            widget.image.naturalSize.height,
+                        crop.right * previewSize.width /
+                            widget.image.naturalSize.width,
+                        crop.bottom * previewSize.height /
+                            widget.image.naturalSize.height,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+      ),
+      FilledButton(
+        onPressed: () {
+          widget.onApply(crop);
+          Navigator.pop(context);
+        },
+        child: Text(t.editor.imageOptions.crop),
+      ),
+    ],
+  );
+}
+
+enum _CropDragMode { none, move, topLeft, topRight, bottomLeft, bottomRight }
+
+class _CropOverlayPainter extends CustomPainter {
+  const _CropOverlayPainter(this.crop);
+
+  final Rect crop;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final outside = Path()
+      ..addRect(Offset.zero & size)
+      ..addRect(crop)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(outside, Paint()..color = Colors.black54);
+    canvas.drawRect(
+      crop,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    for (final point in [
+      crop.topLeft,
+      crop.topRight,
+      crop.bottomLeft,
+      crop.bottomRight,
+    ]) {
+      canvas.drawCircle(point, 7, Paint()..color = Colors.white);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CropOverlayPainter oldDelegate) => oldDelegate.crop != crop;
 }
 
 class _CanvasImageDialogItem extends StatelessWidget {
