@@ -153,6 +153,7 @@ class EditorHistoryItem {
     this.colorChange,
     this.backgroundPatternChange,
     this.imageRectChange,
+    this.replacementStrokes = const [],
   }) : assert(
          type != .move || offset != null,
          'Offset must be provided for move',
@@ -196,6 +197,7 @@ class EditorHistoryItem {
   final Map<Stroke, Change<Color>>? colorChange;
   final Change<CanvasBackgroundPattern>? backgroundPatternChange;
   final Map<EditorImage, ImageRectChange>? imageRectChange;
+  final List<Stroke> replacementStrokes;
 
   EditorHistoryItem copyWith({
     EditorHistoryItemType? type,
@@ -208,6 +210,7 @@ class EditorHistoryItem {
     Map<Stroke, Change<Color>>? colorChange,
     Change<CanvasBackgroundPattern>? backgroundPatternChange,
     Map<EditorImage, ImageRectChange>? imageRectChange,
+    List<Stroke>? replacementStrokes,
   }) {
     return EditorHistoryItem(
       type: type ?? this.type,
@@ -221,6 +224,7 @@ class EditorHistoryItem {
       backgroundPatternChange:
           backgroundPatternChange ?? this.backgroundPatternChange,
       imageRectChange: imageRectChange ?? this.imageRectChange,
+      replacementStrokes: replacementStrokes ?? this.replacementStrokes,
     );
   }
 }

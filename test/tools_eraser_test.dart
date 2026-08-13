@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -13,7 +16,7 @@ final _options = StrokeOptions(
 const _eraserPos = Offset(50, 50);
 
 void main() {
-  test('Test that the eraser tool erases the correct strokes', () {
+  test('eraser removes only the touched portion of a stroke', () {
     final eraser = Eraser(size: 10);
 
     final List<Stroke> strokesToErase = [
@@ -53,38 +56,39 @@ void main() {
     ];
 
     final strokes = <Stroke>[...strokesToErase, ...strokesToKeep];
-    final List<Stroke> erased = eraser.checkForOverlappingStrokes(
-      _eraserPos,
-      strokes,
-    );
+    eraser.checkForOverlappingStrokes(_eraserPos, strokes);
+    final result = eraser.onDragEnd();
 
-    for (final stroke in strokesToErase) {
-      expect(
-        erased,
-        contains(stroke),
-        reason: 'Stroke should be erased: $stroke',
-      );
-    }
+    expect(result.erasedStrokes.length, strokesToErase.length);
+    expect(strokes, containsAll(strokesToKeep));
+  });
 
-    for (final stroke in strokesToKeep) {
-      expect(
-        erased,
-        isNot(contains(stroke)),
-        reason: 'Stroke should not be erased: $stroke',
-      );
-    }
+  test('eraser splits a line and interpolates its boundary points', () {
+    final eraser = Eraser(size: 10);
+    final stroke = _strokeWithPoint(const Offset(0, 50))
+      ..addPoint(const Offset(100, 50), 1);
+    final strokes = [stroke];
 
-    final List<Stroke> erasedStrokes = eraser.onDragEnd();
-    expect(
-      erasedStrokes.length,
-      strokesToErase.length,
-      reason: 'The correct number of strokes should have been erased',
-    );
-    expect(
-      erasedStrokes,
-      everyElement(strokesToErase.contains),
-      reason: 'The correct strokes should have been erased',
-    );
+    eraser.checkForOverlappingStrokes(_eraserPos, strokes);
+    final result = eraser.onDragEnd();
+
+    expect(strokes, hasLength(2));
+    expect(strokes.first.pointVectors.last.x, closeTo(40, 0.001));
+    expect(strokes.last.pointVectors.first.x, closeTo(60, 0.001));
+    expect(result.erasedStrokes, hasLength(1));
+    expect(result.replacementStrokes, hasLength(2));
+  });
+
+  test('fast eraser movement clears the complete swept path', () {
+    final eraser = Eraser(size: 5);
+    final stroke = _strokeWithPoint(const Offset(50, 0))
+      ..addPoint(const Offset(50, 100));
+    final strokes = [stroke];
+
+    eraser.checkForOverlappingStrokes(const Offset(0, 50), strokes);
+    eraser.checkForOverlappingStrokes(const Offset(100, 50), strokes);
+
+    expect(strokes, hasLength(2));
   });
 }
 

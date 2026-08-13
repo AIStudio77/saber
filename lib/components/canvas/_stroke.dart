@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:math';
 
 import 'package:collection/collection.dart';
@@ -22,6 +25,17 @@ class Stroke {
 
   bool get isEmpty => points.isEmpty;
   int get length => points.length;
+
+  /// The input points used to render this stroke.
+  List<PointVector> get pointVectors => List.unmodifiable(points);
+
+  /// Replaces the input points and invalidates all cached geometry.
+  void replacePoints(Iterable<PointVector> newPoints) {
+    points
+      ..clear()
+      ..addAll(newPoints);
+    markPolygonNeedsUpdating();
+  }
 
   int pageIndex;
   HasSize page;

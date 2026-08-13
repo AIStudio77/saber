@@ -16,6 +16,7 @@ import 'package:saber/components/theming/dynamic_material_app.dart';
 import 'package:saber/components/theming/uni_icon.dart';
 import 'package:saber/components/toolbar/color_bar.dart';
 import 'package:saber/components/toolbar/export_bar.dart';
+import 'package:saber/components/toolbar/eraser_modal.dart';
 import 'package:saber/components/toolbar/pen_modal.dart';
 import 'package:saber/components/toolbar/selection_bar.dart';
 import 'package:saber/components/toolbar/size_picker.dart';
@@ -164,7 +165,7 @@ class _ToolbarState extends State<Toolbar> {
 
   void toggleEraser() {
     toolOptionsType.value = .hide;
-    widget.setTool(Eraser()); // this toggles eraser
+    widget.setTool(Eraser.currentEraser);
   }
 
   void toggleColorOptions() {
@@ -254,6 +255,7 @@ class _ToolbarState extends State<Toolbar> {
                 getTool: () => Pencil.currentPencil,
                 setTool: widget.setTool,
               ),
+              .eraser => EraserModal(getTool: () => Eraser.currentEraser),
               .select => SelectionBar(
                 duplicateSelection: widget.duplicateSelection,
                 deleteSelection: widget.deleteSelection,
@@ -463,7 +465,15 @@ class _ToolbarState extends State<Toolbar> {
                 tooltip: t.editor.toolbar.toggleEraser,
                 selected: widget.currentTool is Eraser,
                 enabled: !widget.readOnly,
-                onPressed: toggleEraser,
+                onPressed: () {
+                  if (widget.currentTool is Eraser) {
+                    toolOptionsType.value = toolOptionsType.value == .eraser
+                        ? .hide
+                        : .eraser;
+                  } else {
+                    toggleEraser();
+                  }
+                },
                 padding: buttonPadding,
                 child: const FaIcon(FontAwesomeIcons.eraser, size: 16),
               ),
@@ -602,4 +612,4 @@ class _ToolbarState extends State<Toolbar> {
   }
 }
 
-enum ToolOptions { hide, pen, highlighter, pencil, select }
+enum ToolOptions { hide, pen, highlighter, pencil, eraser, select }
