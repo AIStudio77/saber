@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:math';
 
 import 'package:defer_pointer/defer_pointer.dart';
@@ -189,17 +192,11 @@ class _CanvasImageState extends State<CanvasImage> {
                             widget.image.dstRect.height,
                             CanvasImage.minImageSize,
                           ),
-                    child: SizedOverflowBox(
-                      size: widget.image.srcRect.size,
-                      child: Transform.translate(
-                        offset: -widget.image.srcRect.topLeft,
-                        child: widget.image.buildImageWidget(
-                          context: context,
-                          overrideBoxFit: widget.overrideBoxFit,
-                          isBackground: widget.isBackground,
-                          invert: imageBrightness == .dark,
-                        ),
-                      ),
+                    child: _CroppedImage(
+                      image: widget.image,
+                      overrideBoxFit: widget.overrideBoxFit,
+                      isBackground: widget.isBackground,
+                      invert: imageBrightness == .dark,
                     ),
                   ),
                 ),
@@ -273,6 +270,64 @@ class _CanvasImageState extends State<CanvasImage> {
             },
           ),
           actions: const [],
+        );
+      },
+    );
+  }
+}
+
+class _CroppedImage extends StatelessWidget {
+  const _CroppedImage({
+    required this.image,
+    required this.overrideBoxFit,
+    required this.isBackground,
+    required this.invert,
+  });
+
+  final EditorImage image;
+  final BoxFit? overrideBoxFit;
+  final bool isBackground;
+  final bool invert;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isBackground) {
+      return image.buildImageWidget(
+        context: context,
+        overrideBoxFit: overrideBoxFit,
+        isBackground: true,
+        invert: invert,
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final source = image.srcRect;
+        if (source.isEmpty) return const SizedBox.shrink();
+
+        final scaleX = constraints.maxWidth / source.width;
+        final scaleY = constraints.maxHeight / source.height;
+        final fullSize = Size(
+          image.naturalSize.width * scaleX,
+          image.naturalSize.height * scaleY,
+        );
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topLeft,
+            minWidth: fullSize.width,
+            maxWidth: fullSize.width,
+            minHeight: fullSize.height,
+            maxHeight: fullSize.height,
+            child: Transform.translate(
+              offset: Offset(-source.left * scaleX, -source.top * scaleY),
+              child: image.buildImageWidget(
+                context: context,
+                overrideBoxFit: BoxFit.fill,
+                isBackground: false,
+                invert: invert,
+              ),
+            ),
+          ),
         );
       },
     );
