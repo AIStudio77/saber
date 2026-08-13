@@ -136,7 +136,7 @@ jobs:
       - name: Rename APK
         id: rename_apk
         run: |
-          sourceApk=build/app/outputs/flutter-apk/app-release-community-signed.apk
+          sourceApk=build/app/outputs/flutter-apk/app-release.apk
           if [ ! -f "$sourceApk" ]; then
             echo "Expected community-signed APK not found: $sourceApk" >&2
             find build/app/outputs/flutter-apk -maxdepth 1 -type f -name '*.apk' -print >&2

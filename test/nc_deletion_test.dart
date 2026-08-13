@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -23,6 +26,7 @@ void main() {
     FlavorConfig.setup();
     await FileManager.init();
 
+    stows.url.value = 'https://nc.saber.adil.hanney.org';
     stows.username.value = 'test.deletion';
     stows.ncPassword.value = 'PRmjb-NWLzz-Gisq5-TAbtj-RbpWP';
     stows.encPassword.value = 'test.deletion';

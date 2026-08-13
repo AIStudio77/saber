@@ -26,7 +26,6 @@ val releaseSigningValues = mapOf(
     "keyPassword" to signingValue("keyPassword", "SABER_SIGNING_KEY_PASSWORD", "KEY_PASSWORD"),
 )
 val missingReleaseSigningValues = releaseSigningValues.filterValues { it == null }.keys
-val signingProvenance = signingValue("signingProvenance", "SABER_SIGNING_PROVENANCE") ?: "community"
 val releaseSigningConfig = if (missingReleaseSigningValues.isEmpty()) {
     android.signingConfigs.create("release") {
         keyAlias = releaseSigningValues.getValue("keyAlias")
@@ -40,7 +39,7 @@ val releaseSigningConfig = if (missingReleaseSigningValues.isEmpty()) {
 
 android {
     namespace = "com.adilhanney.saber"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -91,10 +90,6 @@ android.applicationVariants.configureEach {
         val abiVersionCode = abiCodes[output.filters.find { it.filterType == "ABI" }?.identifier]
         if (abiVersionCode != null) {
             (output as ApkVariantOutputImpl).versionCodeOverride = variant.versionCode * 10 + abiVersionCode
-        }
-        if (buildType.name == "release" && signingProvenance != "official") {
-            (output as ApkVariantOutputImpl).outputFileName =
-                output.outputFileName.replace(".apk", "-community-signed.apk")
         }
     }
 }
