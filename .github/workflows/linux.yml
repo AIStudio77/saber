@@ -1,9 +1,9 @@
 # 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI Codex
-name: Build for Linux
+name: Build Flatpak x86_64
 
 on:
-  # Enable manual run
   workflow_dispatch:
+
   push:
     tags:
       - "**"
@@ -11,191 +11,401 @@ on:
       - "**"
     paths:
       - .github/workflows/linux.yml
-      - appimage/AppImageBuilder.yml
       - assets/**
       - flatpak/**
       - lib/**
       - linux/**
       - packages/**
       - patches/**
+      - submodules/**
       - pubspec.lock
       - pubspec.yaml
       - rust-toolchain.toml
 
 jobs:
-  build-linux:
-    strategy:
-      fail-fast: false
-      matrix:
-        arch:
-          - runs-on: ubuntu-latest
-            cache-name: saber
-            target-platform: linux-x64
-            flutter-output-folder: build/linux/x64/release/bundle
-            archive-suffix: x86_64
-            linuxdeploy-exe: linuxdeploy-x86_64.AppImage
-          - runs-on: ubuntu-24.04-arm
-            cache-name: saberarm64
-            target-platform: linux-arm64
-            flutter-output-folder: build/linux/arm64/release/bundle
-            archive-suffix: arm64
-            linuxdeploy-exe: linuxdeploy-aarch64.AppImage
-    runs-on: ${{ matrix.arch.runs-on }}
+  build-flatpak:
+    name: Build Flatpak (x86_64)
+
+    runs-on: ubuntu-latest
+
     permissions:
-      contents: write
-    timeout-minutes: 20
-    name: Build Linux (${{ matrix.arch.target-platform }})
+      contents: read
+
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
+          submodules: recursive
           persist-credentials: false
 
-      - uses: "./.github/shared_workflows/install_apt_dependencies"
-
-      - name: Setup cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: |
-            .dart_tool/
-            build/
-            linux/flutter/ephemeral/
-            macos/Flutter/ephemeral/
-            windows/flutter/ephemeral/
-            .flutter-plugins-dependencies
-            ~/.dartServer
-            ~/.dart-tool
-          key: ${{ runner.OS }}-${{ matrix.arch.cache-name }}-linux-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: |
-            ${{ runner.OS }}-${{ matrix.arch.cache-name }}-
-
-      - name: Setup Flutter
-        uses: adil192/setup-flutter-submodule@v3
-        with:
-          flutter-path: submodules/flutter
-
-      - name: Disable Flutter CLI animations
-        run: flutter config --no-cli-animations
-
-      - run: ./patches/pre/remove_dev_dependencies.sh
-      - run: ./patches/pre/remove_permission_handler.sh
-      - run: ./patches/pre/remove_proprietary_dependencies.sh
-      - run: flutter pub get
-      - run: ./patches/post/patch_rust_versions.sh
-
-      - name: Build Linux (${{ matrix.arch.target-platform }})
-        run: |
-          flutter build linux \
-            --target-platform ${{ matrix.arch.target-platform }} \
-
-      - name: Compress Flutter build
-        id: compress
-        run: |
-          buildName=$(grep -oP "(?<=buildName = ').*(?=')" lib/data/version.dart)
-          archiveName="Saber_v${buildName}_Linux_${{ matrix.arch.archive-suffix }}.tar.gz"
-          echo "archiveName=$archiveName" >> $GITHUB_OUTPUT
-
-          mkdir -p AppDir
-          mv ${{ matrix.arch.flutter-output-folder }}/* AppDir
-          chmod +x AppDir/saber
-
-          install -Dm644 flatpak/com.adilhanney.saber.metainfo.xml -t AppDir/share/metainfo/
-          install -Dm644 assets/icon/icon_linux.svg AppDir/share/icons/hicolor/scalable/apps/com.adilhanney.saber.svg
-          install -Dm644 flatpak/com.adilhanney.saber.desktop -t AppDir/share/applications/
-
-          tar -C AppDir -czvf $archiveName .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: Saber-Archive-${{ matrix.arch.archive-suffix }}
-          path: ${{ steps.compress.outputs.archiveName }}
+      # ------------------------------------------------------------
+      # Flatpak tooling
+      # ------------------------------------------------------------
 
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes flatpak flatpak-builder
-          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user --noninteractive flathub \
-            org.freedesktop.Platform//24.08 \
-            org.freedesktop.Sdk//24.08
+          sudo apt-get install --yes \
+            flatpak \
+            flatpak-builder
 
-      - name: Build Flatpak bundle
-        id: flatpak
+      - name: Add Flathub
         run: |
-          rm -rf flatpak/build-input build-dir flatpak-repo
-          cp -R AppDir flatpak/build-input
-          flatpak-builder --user --force-clean --repo=flatpak-repo \
-            build-dir flatpak/com.adilhanney.saber.yml
+          flatpak remote-add \
+            --user \
+            --if-not-exists \
+            flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
 
-          buildName=$(grep -oP "(?<=buildName = ').*(?=')" lib/data/version.dart)
-          flatpakName="Saber_v${buildName}_${{ matrix.arch.archive-suffix }}.flatpak"
-          flatpak build-bundle flatpak-repo "$flatpakName" com.adilhanney.saber
+      # ------------------------------------------------------------
+      # Generate CI Flatpak manifest
+      #
+      # Important:
+      # Saber is compiled INSIDE org.gnome.Sdk.
+      #
+      # We do NOT run:
+      #
+      #   flutter build linux
+      #
+      # directly on Ubuntu.
+      # ------------------------------------------------------------
+
+      - name: Create Flatpak manifest
+        shell: bash
+        run: |
+          cat > ci-flatpak.yml <<'EOF'
+          app-id: com.adilhanney.saber
+
+          runtime: org.gnome.Platform
+          runtime-version: '50'
+
+          sdk: org.gnome.Sdk
+
+          sdk-extensions:
+            - org.freedesktop.Sdk.Extension.llvm20
+
+          command: saber
+
+          separate-locales: false
+
+          # Runtime permissions.
+          #
+          # Network is intentionally NOT included here.
+          finish-args:
+            - --share=ipc
+            - --socket=fallback-x11
+            - --socket=wayland
+            - --device=dri
+            - --talk-name=org.freedesktop.secrets
+            - --filesystem=xdg-documents/Saber:create
+            - --filesystem=xdg-config/kdeglobals:ro
+
+          cleanup:
+            - /include
+            - /lib/cmake
+            - /lib/pkgconfig
+
+          modules:
+
+            # Saber needs jsoncpp.
+            - name: libjsoncpp
+
+              buildsystem: meson
+
+              config-opts:
+                - --buildtype=release
+                - --default-library=shared
+
+              sources:
+                - type: archive
+                  url: https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.8.tar.gz
+                  sha256: 51828cf3574281d2b79ec2a1c56a9e4c20cc1103711321ea96384cffb8d2d904
+
+            # Saber uses zenity for some desktop interactions.
+            - name: zenity
+
+              buildsystem: meson
+
+              config-opts:
+                - -Dbuildtype=release
+                - -Dmanpage=false
+
+              cleanup:
+                - /share/applications
+                - /share/help
+
+              sources:
+                - type: git
+                  url: https://github.com/GNOME/zenity.git
+                  tag: 4.2.2
+                  commit: c0f30c18e55b6a0cf5c2deb1c7449debb79027dc
+
+            # ------------------------------------------------------
+            # Saber
+            # ------------------------------------------------------
+
+            - name: saber
+
+              buildsystem: simple
+
+              build-options:
+
+                # This is BUILD-TIME network access only.
+                #
+                # It allows:
+                #   - Flutter SDK downloads
+                #   - flutter pub get
+                #   - rustup
+                #   - Cargo downloads
+                #
+                # It does NOT grant the installed application network
+                # access because --share=network is absent from
+                # finish-args above.
+                build-args:
+                  - --share=network
+
+                append-path: /usr/lib/sdk/llvm20/bin:/run/build/saber/.cargo/bin:/run/build/saber/submodules/flutter/bin
+
+                prepend-ld-library-path: /usr/lib/sdk/llvm20/lib
+
+                env:
+                  PUB_CACHE: /run/build/saber/.pub-cache
+                  CARGO_HOME: /run/build/saber/.cargo
+                  RUSTUP_HOME: /run/build/saber/.rustup
+
+              build-commands:
+
+                # --------------------------------------------------
+                # Apply Saber's normal Linux patches
+                # --------------------------------------------------
+
+                - ./patches/pre/remove_dev_dependencies.sh
+
+                - ./patches/pre/remove_permission_handler.sh
+
+                - ./patches/pre/remove_proprietary_dependencies.sh
+
+                # --------------------------------------------------
+                # Rust
+                # --------------------------------------------------
+
+                - >
+                  curl
+                  --proto '=https'
+                  --tlsv1.2
+                  -sSf
+                  https://sh.rustup.rs
+                  |
+                  sh -s --
+                  -y
+                  --profile minimal
+                  --default-toolchain none
+
+                - >
+                  RUST_VERSION="$(sed -n
+                  's/.*channel *= *"\([^"]*\)".*/\1/p'
+                  rust-toolchain.toml)";
+                  echo "Using Rust ${RUST_VERSION}";
+                  rustup toolchain install "${RUST_VERSION}";
+                  rustup default "${RUST_VERSION}"
+
+                # --------------------------------------------------
+                # Flutter
+                #
+                # This now runs INSIDE org.gnome.Sdk.
+                # --------------------------------------------------
+
+                - flutter config --no-cli-animations
+
+                - flutter pub get
+
+                - ./patches/post/patch_rust_versions.sh
+
+                - >
+                  flutter build linux
+                  --target-platform linux-x64
+                  --no-pub
+
+                # --------------------------------------------------
+                # Install application into /app
+                # --------------------------------------------------
+
+                - >
+                  cp -a
+                  build/linux/x64/release/bundle
+                  /app/com.adilhanney.saber
+
+                - mkdir -p /app/bin
+
+                - >
+                  ln -s
+                  /app/com.adilhanney.saber/saber
+                  /app/bin/saber
+
+                - >
+                  install
+                  -Dm644
+                  flatpak/com.adilhanney.saber.desktop
+                  -t /app/share/applications/
+
+                - >
+                  install
+                  -Dm644
+                  flatpak/com.adilhanney.saber.metainfo.xml
+                  -t /app/share/metainfo/
+
+                - >
+                  install
+                  -Dm644
+                  assets/icon/icon_linux.svg
+                  /app/share/icons/hicolor/scalable/apps/com.adilhanney.saber.svg
+
+              sources:
+
+                # Build the exact commit that triggered this workflow.
+                #
+                # The placeholders below are replaced by the workflow.
+                - type: git
+                  url: __REPOSITORY_URL__
+                  commit: __COMMIT__
+                  disable-submodules: false
+
+          EOF
+
+          sed -i \
+            "s|__REPOSITORY_URL__|https://github.com/${GITHUB_REPOSITORY}.git|g" \
+            ci-flatpak.yml
+
+          sed -i \
+            "s|__COMMIT__|${GITHUB_SHA}|g" \
+            ci-flatpak.yml
+
+          echo "Generated manifest:"
+          cat ci-flatpak.yml
+
+      # ------------------------------------------------------------
+      # Build
+      # ------------------------------------------------------------
+
+      - name: Build Flatpak
+        run: |
+          rm -rf \
+            build-dir \
+            flatpak-repo \
+            .flatpak-builder
+
+          flatpak-builder \
+            --arch=x86_64 \
+            --user \
+            --force-clean \
+            --install-deps-from=flathub \
+            --install \
+            --repo=flatpak-repo \
+            build-dir \
+            ci-flatpak.yml
+
+      # ------------------------------------------------------------
+      # Verify dynamic libraries INSIDE Flatpak
+      # ------------------------------------------------------------
+
+      - name: Check for missing shared libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Dynamic dependencies:"
+          flatpak run \
+            --command=sh \
+            com.adilhanney.saber \
+            -c '
+              ldd /app/com.adilhanney.saber/saber
+            '
+
+          echo
+          echo "Checking for missing libraries..."
+
+          missing="$(
+            flatpak run \
+              --command=sh \
+              com.adilhanney.saber \
+              -c '
+                ldd /app/com.adilhanney.saber/saber |
+                grep "not found" || true
+              '
+          )"
+
+          if [ -n "$missing" ]; then
+            echo "Missing shared libraries:"
+            echo "$missing"
+            exit 1
+          fi
+
+          echo "All shared libraries resolved successfully."
+
+      # ------------------------------------------------------------
+      # Verify WebKitGTK specifically
+      # ------------------------------------------------------------
+
+      - name: Verify WebKitGTK
+        run: |
+          flatpak run \
+            --command=sh \
+            com.adilhanney.saber \
+            -c '
+              ldd /app/com.adilhanney.saber/saber |
+              grep -E "webkit|javascriptcore" || true
+            '
+
+          flatpak run \
+            --command=sh \
+            com.adilhanney.saber \
+            -c '
+              test -e /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0 ||
+              find /usr /app \
+                -name "libwebkit2gtk-4.1.so*" \
+                -print \
+                -quit
+            '
+
+      # ------------------------------------------------------------
+      # Build distributable .flatpak
+      # ------------------------------------------------------------
+
+      - name: Create Flatpak bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          buildName="$(
+            grep -oP "(?<=buildName = ').*(?=')" \
+              lib/data/version.dart
+          )"
+
+          flatpakName="Saber_v${buildName}_x86_64.flatpak"
+
+          flatpak build-bundle \
+            --arch=x86_64 \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            flatpak-repo \
+            "$flatpakName" \
+            com.adilhanney.saber \
+            master
+
           echo "flatpakName=$flatpakName" >> "$GITHUB_OUTPUT"
+
+          ls -lh "$flatpakName"
+
+      # ------------------------------------------------------------
+      # Upload ONLY the .flatpak
+      # ------------------------------------------------------------
 
       - name: Upload Flatpak artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Saber-Flatpak-${{ matrix.arch.archive-suffix }}
-          path: ${{ steps.flatpak.outputs.flatpakName }}
+          name: Saber-Flatpak-x86_64
+          path: ${{ steps.bundle.outputs.flatpakName }}
           if-no-files-found: error
-
-      - name: Upload to GitHub release
-        uses: svenstaro/upload-release-action@v2
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ steps.compress.outputs.archiveName }}
-
-      # Now build AppImage
-
-      - name: Install FUSE
-        run: |
-          sudo add-apt-repository universe
-          sudo apt-get install libfuse2t64
-
-      - name: Prepare AppDir for AppImage
-        run: |
-          rm -rf linux/AppImage/AppDir/
-
-          # Copy flutter bundle into AppDir/usr/bin/
-          mkdir -p linux/AppImage/AppDir/usr/bin/
-          cp -R AppDir/* linux/AppImage/AppDir/usr/bin/
-
-          # Move share folder to usr/share
-          mv linux/AppImage/AppDir/usr/bin/share linux/AppImage/AppDir/usr/
-
-          # Set environment variables for linuxdeploy
-          echo "LD_LIBRARY_PATH=$(pwd)/linux/AppImage/AppDir/usr/bin/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo 'UPDATE_INFORMATION=gh-releases-zsync|saber-notes|saber|latest|Saber-*-${{ matrix.arch.archive-suffix }}.AppImage.zsync' >> $GITHUB_ENV
-
-      - name: Install linuxdeploy
-        working-directory: linux/AppImage
-        run: |
-          wget https://github.com/linuxdeploy/linuxdeploy/releases/latest/download/${{ matrix.arch.linuxdeploy-exe }}
-          chmod +x ${{ matrix.arch.linuxdeploy-exe }}
-      - name: Build AppImage
-        working-directory: linux/AppImage
-        run: ./${{ matrix.arch.linuxdeploy-exe }} --appdir AppDir --output appimage
-
-      - run: tree linux/AppImage -L 3
-
-      - name: Rename AppImage
-        run: |
-          buildName=$(grep -oP "(?<=buildName = ').*(?=')" lib/data/version.dart)
-          mv linux/AppImage/Saber-*.AppImage       linux/AppImage/Saber-${buildName}-${{ matrix.arch.archive-suffix }}.AppImage
-          mv linux/AppImage/Saber-*.AppImage.zsync linux/AppImage/Saber-${buildName}-${{ matrix.arch.archive-suffix }}.AppImage.zsync
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: AppImage artifact (${{ matrix.arch.target-platform }})
-          path: linux/AppImage/Saber-*.AppImage*
-
-      - name: Upload to GitHub release
-        uses: svenstaro/upload-release-action@v2
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: linux/AppImage/Saber-*.AppImage*
-          file_glob: true
