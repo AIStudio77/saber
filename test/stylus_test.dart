@@ -1,9 +1,13 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/flavor_config.dart';
 import 'package:saber/data/prefs.dart';
+import 'package:saber/data/tools/eraser.dart';
 import 'package:saber/pages/editor/editor.dart';
 
 import 'utils/test_mock_channel_handlers.dart';
@@ -40,6 +44,47 @@ void main() {
           buttons: kSecondaryButton,
         );
         expect(page.strokes, hasLength(0));
+      });
+
+      testWidgets('Holding the stylus button keeps the eraser active', (
+        tester,
+      ) async {
+        final editorState = await tester._pumpEditor();
+        await tester.pump();
+
+        await tester._stylusDrag(
+          editorState,
+          withHover,
+          buttons: kSecondaryButton,
+        );
+
+        expect(editorState.currentTool, isA<Eraser>());
+        editorState.onHovering();
+        editorState.onStylusButtonChanged(false);
+        expect(editorState.currentTool, isNot(isA<Eraser>()));
+      });
+
+      testWidgets('Separate button eraser gestures do not erase between taps', (
+        tester,
+      ) async {
+        final editorState = await tester._pumpEditor();
+        await tester.pump();
+        final page = editorState.coreInfo.pages.first;
+        await tester._stylusDrag(editorState, withHover);
+        expect(page.strokes, hasLength(1));
+
+        await tester._stylusTap(
+          editorState,
+          withHover,
+          const Offset(0, 20),
+        );
+        await tester._stylusTap(
+          editorState,
+          withHover,
+          const Offset(20, 0),
+        );
+
+        expect(page.strokes, hasLength(1));
       });
 
       // Styluses like the Noris Digital Jumbo have an eraser on the bottom.
@@ -92,5 +137,23 @@ extension on WidgetTester {
       );
     }
     await gesture.up(timeStamp: const Duration(seconds: 10));
+  }
+
+  Future<void> _stylusTap(
+    EditorState editorState,
+    bool withHover,
+    Offset offset,
+  ) async {
+    final position = getCenter(find.byType(Editor)) + offset;
+    final gesture = await createGesture(
+      kind: PointerDeviceKind.stylus,
+      buttons: kSecondaryButton,
+    );
+    if (withHover) {
+      await gesture.moveTo(position);
+      editorState.onStylusButtonChanged(true);
+    }
+    await gesture.down(position);
+    await gesture.up();
   }
 }
