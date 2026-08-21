@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
@@ -478,10 +481,6 @@ class CanvasGestureDetectorState extends State<CanvasGestureDetector> {
 
   void _listenerPointerUpEvent(PointerEvent event) {
     widget.updatePointerData(event.kind, null);
-    if (stylusButtonWasPressed) {
-      stylusButtonWasPressed = false;
-      widget.onStylusButtonChanged(false);
-    }
   }
 
   @override
