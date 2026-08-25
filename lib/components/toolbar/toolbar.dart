@@ -588,6 +588,7 @@ class _ToolbarState extends State<Toolbar> {
 
     return Flex(
       direction: isToolbarVertical ? Axis.horizontal : Axis.vertical,
+      mainAxisSize: MainAxisSize.min,
       textDirection: switch (stows.editorToolbarAlignment.value) {
         AxisDirection.left => .rtl,
         AxisDirection.right => .ltr,
