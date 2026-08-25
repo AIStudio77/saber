@@ -1,3 +1,4 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
 /// Adapted for Saber from Flutter's [InteractiveViewer] class
 /// https://github.com/flutter/flutter/blob/stable/packages/flutter/lib/src/widgets/interactive_viewer.dart
 /// Using this commit (Flutter 3.44.0):
@@ -497,6 +498,8 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
   double? _rotationStart = 0; // Rotation at start of rotation gesture.
   double _currentRotation = 0; // Rotation of _transformationController.value.
   _GestureType? _gestureType;
+  int _pointerCount = 0;
+  double _gestureScaleReference = 1;
 
   // -TODO(justinmc): Add rotateEnabled parameter to the widget and remove this
   // hardcoded value when the rotation feature is implemented.
@@ -705,7 +708,9 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
   // starts at 0. Pan will have no scale and no rotation because it uses only one
   // finger.
   _GestureType _getGestureType(ScaleUpdateDetails details) {
-    final double scale = !widget.scaleEnabled ? 1.0 : details.scale;
+    final double scale = !widget.scaleEnabled
+        ? 1.0
+        : details.scale / _gestureScaleReference;
     final double rotation = !_rotateEnabled ? 0.0 : details.rotation;
     if ((scale - 1).abs() > rotation.abs()) {
       return _GestureType.scale;
@@ -737,6 +742,8 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
     _gestureType = null;
     _currentAxis = null;
     _scaleStart = _transformer.value.getMaxScaleOnAxis();
+    _pointerCount = details.pointerCount;
+    _gestureScaleReference = 1;
     _referenceFocalPoint = _transformer.toScene(details.localFocalPoint);
     _rotationStart = _currentRotation;
 
@@ -754,6 +761,15 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
     final Offset focalPointScene = _transformer.toScene(
       details.localFocalPoint,
     );
+
+    if (details.pointerCount != _pointerCount) {
+      _pointerCount = details.pointerCount;
+      _scaleStart = scale;
+      _gestureScaleReference = details.scale;
+      _referenceFocalPoint = focalPointScene;
+      _currentAxis = null;
+      return;
+    }
 
     if (_gestureType == _GestureType.pan) {
       // When a gesture first starts, it sometimes has no change in scale and
@@ -774,7 +790,8 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
         // details.scale gives us the amount to change the scale as of the
         // start of this gesture, so calculate the amount to scale as of the
         // previous call to _onScaleUpdate.
-        final double desiredScale = _scaleStart! * details.scale;
+        final double desiredScale =
+            _scaleStart! * details.scale / _gestureScaleReference;
         final double scaleChange = desiredScale / scale;
         _transformer.value = _matrixScale(_transformer.value, scaleChange);
 
@@ -819,7 +836,7 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
         // details may have a change in scale here when scaleEnabled is false.
         // In an effort to keep the behavior similar whether or not scaleEnabled
         // is true, these gestures are thrown away.
-        if (details.scale != 1.0) {
+        if (details.scale / _gestureScaleReference != 1.0) {
           return;
         }
 
@@ -851,6 +868,7 @@ class _InteractiveCanvasViewerState extends State<InteractiveCanvasViewer>
     }
 
     _scaleStart = null;
+    _pointerCount = 0;
     _rotationStart = null;
     _referenceFocalPoint = null;
 

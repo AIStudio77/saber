@@ -1,5 +1,9 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:saber/components/canvas/_canvas_painter.dart';
 import 'package:saber/components/canvas/canvas_gesture_detector.dart';
 import 'package:saber/data/extensions/matrix4_extensions.dart';
 
@@ -86,5 +90,11 @@ void main() {
       containerBounds: containerBounds,
     );
     expect(newMatrix, isNull);
+  });
+
+  test('Pen thickness has a zoom-independent screen-space minimum', () {
+    expect(CanvasPainter.effectivePenSize(1, 1), 1.5);
+    expect(CanvasPainter.effectivePenSize(1, 0.3), 5);
+    expect(CanvasPainter.effectivePenSize(4, 1), 4);
   });
 }
