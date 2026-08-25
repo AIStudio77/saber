@@ -1,3 +1,6 @@
+/// 🤖 Generated wholely or partially with GPT-5.6 Sol; OpenAI Codex
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -60,6 +63,36 @@ void main() {
       expect(events, hasLength(greaterThanOrEqualTo(1)));
       expect(events.last.filePath, '/test'); // without the extension
       expect(events.last.type, FileOperationType.delete);
+    });
+
+    test('switching roots discovers existing nested notes', () async {
+      final oldRoot = await Directory.systemTemp.createTemp('saber-old-');
+      final newRoot = await Directory.systemTemp.createTemp('saber-new-');
+      addTearDown(() async {
+        if (oldRoot.existsSync()) await oldRoot.delete(recursive: true);
+        if (newRoot.existsSync()) await newRoot.delete(recursive: true);
+      });
+
+      await FileManager.init(documentsDirectory: oldRoot.path);
+      final nestedNote = File('${newRoot.path}/folder/existing.sbn2');
+      await nestedNote.create(recursive: true);
+      await nestedNote.writeAsString('existing note');
+      events.clear();
+
+      await FileManager.useDataDir(newRoot.path);
+      await null;
+
+      final rootChildren = await FileManager.getChildrenOfDirectory('/');
+      final nestedChildren = await FileManager.getChildrenOfDirectory('/folder');
+      expect(rootChildren?.directories, contains('folder'));
+      expect(nestedChildren?.files, contains('existing'));
+      expect(
+        events.any(
+          (event) =>
+              event.type == FileOperationType.write && event.filePath == '/',
+        ),
+        isTrue,
+      );
     });
   });
 }

@@ -1,3 +1,6 @@
+/// 🤖 Generated wholely or partially with GPT-5.6 Sol; OpenAI Codex
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -34,6 +37,7 @@ class FileManager {
   static late String documentsDirectory;
 
   static final fileWriteStream = StreamController<FileOperation>.broadcast();
+  static StreamSubscription<FileSystemEvent>? _rootDirectorySubscription;
 
   // TODO(adil192): Implement or remove this
   static String _sanitisePath(String path) => File(path).path;
@@ -73,7 +77,7 @@ class FileManager {
     FileManager.documentsDirectory =
         documentsDirectory ?? await getDocumentsDirectory();
 
-    if (shouldWatchRootDirectory) unawaited(watchRootDirectory());
+    if (shouldWatchRootDirectory) await watchRootDirectory();
   }
 
   static Future<String> getDocumentsDirectory() async =>
@@ -82,31 +86,22 @@ class FileManager {
   static Future<String> getDefaultDocumentsDirectory() async =>
       '${(await getApplicationDocumentsDirectory()).path}/$appRootDirectoryPrefix';
 
-  static Future<void> migrateDataDir() async {
-    final oldDir = Directory(documentsDirectory);
-    final newDir = Directory(await getDocumentsDirectory());
-    if (oldDir.path == newDir.path) return;
-    log.info('Migrating data directory from $oldDir to $newDir');
+  /// Selects [directory] as the root without moving or deleting either root.
+  ///
+  /// Existing Saber notes and nested folders in [directory] are immediately
+  /// available. This is intentionally independent from server synchronization.
+  static Future<void> useDataDir(String directory) async {
+    final newDir = Directory(directory);
+    await newDir.create(recursive: true);
 
-    late final oldDirEmpty = oldDir.existsSync()
-        ? oldDir.listSync().isEmpty
-        : true;
-    late final newDirEmpty = newDir.existsSync()
-        ? newDir.listSync().isEmpty
-        : true;
+    final oldDirectory = documentsDirectory;
+    if (p.equals(oldDirectory, newDir.path)) return;
 
-    if (!oldDirEmpty && !newDirEmpty) {
-      log.severe('New and old data directory aren\'t empty, can\'t migrate');
-      return;
-    }
-
+    await _rootDirectorySubscription?.cancel();
+    _rootDirectorySubscription = null;
     documentsDirectory = newDir.path;
-    if (oldDirEmpty) {
-      log.fine('Old data directory is empty or missing, nothing to migrate');
-    } else {
-      await moveDirContents(oldDir: oldDir, newDir: newDir);
-      await oldDir.delete(recursive: true);
-    }
+    await watchRootDirectory();
+    broadcastFileWrite(FileOperationType.write, '/');
   }
 
   static Future<void> moveDirContents({
@@ -126,8 +121,7 @@ class FileManager {
       }
 
       if (entity is File) {
-        // Ensure parent exists
-        await entity.parent.create(recursive: true);
+        await File(targetPath).parent.create(recursive: true);
 
         try {
           await entity.rename(targetPath);
@@ -147,29 +141,41 @@ class FileManager {
 
   @visibleForTesting
   static Future<void> watchRootDirectory() async {
+    await _rootDirectorySubscription?.cancel();
+    _rootDirectorySubscription = null;
+
     final rootDir = Directory(documentsDirectory);
     await rootDir.create(recursive: true);
     if (Platform.isIOS) return;
-    rootDir.watch(recursive: true).listen((event) {
-      final FileOperationType type = switch (event.type) {
-        FileSystemEvent.delete => .delete,
-        FileSystemEvent.create => .write,
-        FileSystemEvent.modify => .write,
-        FileSystemEvent.move => .write,
-        _ =>
-          kDebugMode
-              ? throw UnimplementedError(
-                  'Unhandled FileSystemEvent type: ${event.type}',
-                )
-              : .write,
-      };
-      final String path = event.path
-          .replaceAll('\\', '/')
-          // The path may or may not be relative,
-          // so remove the root directory path to make sure it's relative.
-          .replaceFirst(documentsDirectory, '');
-      broadcastFileWrite(type, path);
-    });
+    final watchedDirectory = rootDir.path;
+    try {
+      _rootDirectorySubscription = rootDir.watch(recursive: true).listen((
+        event,
+      ) {
+        final FileOperationType type = switch (event.type) {
+          FileSystemEvent.delete => .delete,
+          FileSystemEvent.create => .write,
+          FileSystemEvent.modify => .write,
+          FileSystemEvent.move => .write,
+          _ =>
+            kDebugMode
+                ? throw UnimplementedError(
+                    'Unhandled FileSystemEvent type: ${event.type}',
+                  )
+                : .write,
+        };
+        final String path = event.path
+            .replaceAll('\\', '/')
+            .replaceFirst(watchedDirectory.replaceAll('\\', '/'), '');
+        broadcastFileWrite(type, path);
+      });
+    } on FileSystemException catch (error, stackTrace) {
+      log.warning(
+        'Directory watching is unavailable for $rootDir',
+        error,
+        stackTrace,
+      );
+    }
   }
 
   @visibleForTesting
