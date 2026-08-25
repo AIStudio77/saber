@@ -319,8 +319,7 @@ class _ToolbarState extends State<Toolbar> {
                           iconTheme: iconTheme,
                         ),
                       ),
-                      // scrollable on Android and iOS
-                      multiRowsDisplay: !Platform.isAndroid && !Platform.isIOS,
+                      multiRowsDisplay: false,
                       showUndo: false,
                       showRedo: false,
                       showFontSize: false,
@@ -332,13 +331,14 @@ class _ToolbarState extends State<Toolbar> {
           );
         },
       ),
-      Center(
+      Flexible(
         child: Padding(
           padding: const .all(8),
-          child: Wrap(
-            direction: isToolbarVertical ? Axis.vertical : Axis.horizontal,
-            alignment: WrapAlignment.center,
-            runSpacing: 8,
+          child: ListView(
+            scrollDirection: isToolbarVertical
+                ? Axis.vertical
+                : Axis.horizontal,
+            shrinkWrap: true,
             children: [
               ToolbarIconButton(
                 tooltip: Pen.currentPen.name,

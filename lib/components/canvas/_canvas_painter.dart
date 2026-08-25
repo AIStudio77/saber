@@ -1,3 +1,6 @@
+/// 🤖 Generated wholly or partially with GPT-5.6 Sol; OpenAI
+library;
+
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -44,6 +47,19 @@ class CanvasPainter extends CustomPainter {
   final int totalPages;
   final double currentScale;
   final TextStyle defaultTextStyle;
+
+  /// The minimum width of a pen stroke after the canvas transform is applied.
+  @visibleForTesting
+  static const minimumPenScreenWidth = 1.5;
+
+  /// Returns the authored pen size adjusted to remain visible at [scale].
+  @visibleForTesting
+  static double effectivePenSize(double authoredSize, double scale) {
+    if (scale <= 0) return authoredSize;
+    final minimumCanvasWidth = minimumPenScreenWidth / scale;
+    if (!minimumCanvasWidth.isFinite) return authoredSize;
+    return max(authoredSize, minimumCanvasWidth);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -139,9 +155,11 @@ class CanvasPainter extends CustomPainter {
         ..strokeWidth = stroke.options.size;
 
       if (stroke is CircleStroke) {
+        shapePaint.strokeWidth = _effectiveStrokeSize(stroke);
         canvas.drawCircle(stroke.center, stroke.radius, shapePaint);
       } else if (stroke is RectangleStroke) {
-        final strokeSize = stroke.options.size;
+        final strokeSize = _effectiveStrokeSize(stroke);
+        shapePaint.strokeWidth = strokeSize;
         canvas.drawRRect(
           RRect.fromRectAndRadius(stroke.rect, Radius.circular(strokeSize / 4)),
           shapePaint,
@@ -175,7 +193,7 @@ class CanvasPainter extends CustomPainter {
     }
 
     // Current stroke always uses high quality
-    canvas.drawPath(currentStroke!.highQualityPath, paint);
+    canvas.drawPath(_selectPath(currentStroke!, forceHighQuality: true), paint);
   }
 
   void _drawLaserStroke(Canvas canvas, LaserStroke stroke) {
@@ -199,7 +217,9 @@ class CanvasPainter extends CustomPainter {
     final shapePaint = Paint()
       ..color = Color.lerp(color, primaryColor, 0.5)!.withValues(alpha: 0.7)
       ..style = .stroke
-      ..strokeWidth = currentStroke?.options.size ?? 3;
+      ..strokeWidth = currentStroke == null
+          ? 3
+          : _effectiveStrokeSize(currentStroke!);
 
     switch (shape.name) {
       case null:
@@ -294,8 +314,18 @@ class CanvasPainter extends CustomPainter {
       currentScale >= _zoomThreshold && (strokeSize * currentScale) >= 3;
 
   static const _zoomThreshold = 0.9;
-  Path _selectPath(Stroke stroke) => switch (currentScale) {
-    < _zoomThreshold => stroke.lowQualityPath,
-    _ => stroke.highQualityPath,
-  };
+  double _effectiveStrokeSize(Stroke stroke) {
+    if (stroke.toolId != .pen && stroke.toolId != .shapePen) {
+      return stroke.options.size;
+    }
+    return effectivePenSize(stroke.options.size, currentScale);
+  }
+
+  Path _selectPath(Stroke stroke, {bool forceHighQuality = false}) {
+    final quality = !forceHighQuality && currentScale < _zoomThreshold
+        ? StrokeQuality.low
+        : StrokeQuality.high;
+    final size = _effectiveStrokeSize(stroke);
+    return stroke.getDisplayPath(size: size, quality: quality);
+  }
 }

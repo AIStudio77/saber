@@ -55,6 +55,9 @@ class Stroke {
       _highQualityPolygon ??= getPolygon(quality: .high);
 
   Path? _lowQualityPath, _highQualityPath;
+  Path? _displayPath;
+  double? _displayPathSize;
+  StrokeQuality? _displayPathQuality;
   Path get lowQualityPath =>
       _lowQualityPath ??= getPath(lowQualityPolygon, smooth: false);
   Path get highQualityPath => _highQualityPath ??= getPath(highQualityPolygon);
@@ -67,6 +70,7 @@ class Stroke {
     _highQualityPolygon?.shift(offset);
     _lowQualityPath = _lowQualityPath?.shift(offset);
     _highQualityPath = _highQualityPath?.shift(offset);
+    _displayPath = _displayPath?.shift(offset);
   }
 
   void markPolygonNeedsUpdating() {
@@ -74,6 +78,38 @@ class Stroke {
     _highQualityPolygon = null;
     _lowQualityPath = null;
     _highQualityPath = null;
+    _displayPath = null;
+    _displayPathSize = null;
+    _displayPathQuality = null;
+  }
+
+  /// Returns display geometry rendered at [size] without changing the authored
+  /// stroke thickness.
+  Path getDisplayPath({required double size, required StrokeQuality quality}) {
+    if (size == options.size) {
+      return quality == .low ? lowQualityPath : highQualityPath;
+    }
+    if (_displayPathSize == size && _displayPathQuality == quality) {
+      return _displayPath!;
+    }
+
+    final displayOptions = switch (quality) {
+      .low => options.copyWith(
+        size: size,
+        simulatePressure: false,
+        smoothing: 0,
+        streamline: 0,
+      ),
+      .high => options.copyWith(size: size, simulatePressure: false),
+    };
+    final polygon = getStroke(
+      skipPoints(points, quality.N),
+      options: displayOptions,
+    );
+
+    _displayPathSize = size;
+    _displayPathQuality = quality;
+    return _displayPath = getPath(polygon, smooth: quality == .high);
   }
 
   Stroke({
