@@ -1,4 +1,5 @@
-import 'dart:io';
+/// 🤖 Generated wholely or partially with GPT-5.6 Sol; OpenAI Codex
+library;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
@@ -17,25 +18,18 @@ class SettingsDirectorySelector extends StatelessWidget {
     required this.title,
     required this.icon,
     this.afterChange,
-    this.isUnsupported = true,
   });
 
   final String title;
   final IconData icon;
   final ValueChanged<Color?>? afterChange;
-  final bool isUnsupported;
 
   void onPressed(BuildContext context) async {
-    final oldDir = Directory(FileManager.documentsDirectory);
-    final oldDirIsEmpty = oldDir.existsSync()
-        ? oldDir.listSync().isEmpty
-        : true;
     await showAdaptiveDialog(
       context: context,
       builder: (context) => DirectorySelector(
         title: title,
         initialDirectory: FileManager.documentsDirectory,
-        mustBeEmpty: !oldDirIsEmpty,
       ),
     );
   }
@@ -77,13 +71,11 @@ class DirectorySelector extends StatefulWidget {
     super.key,
     required this.title,
     required this.initialDirectory,
-    this.mustBeEmpty = true,
     this.mustBeDoneSyncing = true,
   });
 
   final String title;
   final String initialDirectory;
-  final bool mustBeEmpty;
   final bool mustBeDoneSyncing;
 
   @override
@@ -92,7 +84,6 @@ class DirectorySelector extends StatefulWidget {
 
 class _DirectorySelectorState extends State<DirectorySelector> {
   late String _directory = widget.initialDirectory;
-  late var _isEmpty = true;
 
   Future<void> _pickDir() async {
     final directory = await FilePicker.getDirectoryPath(
@@ -103,9 +94,7 @@ class _DirectorySelectorState extends State<DirectorySelector> {
     if (directory == null) return;
     if (directory == _directory) return;
 
-    final dir = Directory(directory);
     _directory = directory;
-    _isEmpty = dir.existsSync() ? dir.listSync().isEmpty : true;
 
     if (!mounted) return;
 
@@ -115,16 +104,16 @@ class _DirectorySelectorState extends State<DirectorySelector> {
   Future<void> _pickDefaultDir() async {
     final directory = await FileManager.getDefaultDocumentsDirectory();
 
-    final dir = Directory(directory);
     _directory = directory;
-    _isEmpty = dir.existsSync() ? dir.listSync().isEmpty : true;
 
     if (!mounted) return;
     setState(() {});
   }
 
-  void _onConfirm() {
+  Future<void> _onConfirm() async {
+    await FileManager.useDataDir(_directory);
     stows.customDataDir.value = _directory;
+    if (!mounted) return;
     context.pop();
   }
 
@@ -132,21 +121,16 @@ class _DirectorySelectorState extends State<DirectorySelector> {
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme.of(context);
 
-    final emptyError = widget.mustBeEmpty && !_isEmpty;
     final syncingError =
         widget.mustBeDoneSyncing &&
         (syncer.uploader.numPending > 0 || syncer.downloader.numPending > 0);
-    final anyErrors = emptyError || syncingError;
+    final anyErrors = syncingError;
 
     return AdaptiveAlertDialog(
       title: Text(widget.title),
       content: Column(
         mainAxisSize: .min,
         children: [
-          Text(
-            t.settings.customDataDir.unsupported,
-            style: TextStyle(color: colorScheme.error),
-          ),
           Row(
             children: [
               Expanded(
@@ -167,11 +151,6 @@ class _DirectorySelectorState extends State<DirectorySelector> {
                 ),
             ],
           ),
-          if (emptyError)
-            Text(
-              t.settings.customDataDir.mustBeEmpty,
-              style: TextStyle(color: colorScheme.error),
-            ),
           if (syncingError)
             Text(
               t.settings.customDataDir.mustBeDoneSyncing,

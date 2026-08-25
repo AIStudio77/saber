@@ -1,3 +1,6 @@
+/// 🤖 Generated wholely or partially with GPT-5.6 Sol; OpenAI Codex
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -103,7 +106,6 @@ Future<void> appRunner(List<String> args) async {
 
   setLocale();
   stows.locale.addListener(setLocale);
-  stows.customDataDir.addListener(FileManager.migrateDataDir);
   pdfrxFlutterInitialize();
 
   LicenseRegistry.addLicense(() async* {
