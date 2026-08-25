@@ -20,6 +20,13 @@ jobs:
 
       - uses: "./.github/shared_workflows/install_apt_dependencies"
 
+      - name: Verify native dependencies
+        run: |
+          pkg-config --modversion glib-2.0
+          pkg-config --modversion gobject-2.0
+          pkg-config --modversion gio-2.0
+          pkg-config --modversion gtk+-3.0
+
       - name: Setup cache
         uses: actions/cache@v6.1.0
         with:
@@ -35,9 +42,9 @@ jobs:
             windows/flutter/ephemeral/
             ~/.dartServer/
             ~/.dart-tool/
-          key: ${{ runner.OS }}-saber-${{ hashFiles('**/pubspec.yaml') }}
+          key: ${{ runner.OS }}-saber-v2-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
-            ${{ runner.OS }}-saber-
+            ${{ runner.OS }}-saber-v2-
 
       - name: Setup Flutter
         uses: adil192/setup-flutter-submodule@v3
