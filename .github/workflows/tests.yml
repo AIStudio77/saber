@@ -69,25 +69,6 @@ jobs:
         id: tests
         run: flutter test --coverage --no-pub --file-reporter=json:test-results.json
 
-      - name: Convert test results to JUnit XML for Codecov
-        run: |
-          flutter pub add dev:junitify
-          dart run junitify -i test-results.json -o test-results.xml
-
-      - name: Upload to Codecov
-        if: success()
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage/lcov.info
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          report_type: test_results
-          files: test-results.xml
-
       - name: Ensure test failures directory exists
         if: failure()
         run: mkdir -p test/failures
