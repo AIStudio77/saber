@@ -17,6 +17,7 @@ import 'package:saber/data/tools/highlighter.dart';
 import 'package:saber/data/tools/laser_pointer.dart';
 import 'package:saber/data/tools/select.dart';
 import 'package:saber/data/tools/shape_pen.dart';
+import 'package:sbn/tool_id.dart';
 
 class CanvasPainter extends CustomPainter {
   const CanvasPainter({
@@ -60,6 +61,18 @@ class CanvasPainter extends CustomPainter {
     if (!minimumCanvasWidth.isFinite) return authoredSize;
     return max(authoredSize, minimumCanvasWidth);
   }
+
+  /// Returns the display size appropriate for [toolId] at [scale].
+  @visibleForTesting
+  static double effectiveStrokeSize(
+    ToolId toolId,
+    double authoredSize,
+    double scale,
+  ) => switch (toolId) {
+    .fountainPen || .ballpointPen || .shapePen =>
+      effectivePenSize(authoredSize, scale),
+    _ => authoredSize,
+  };
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -314,12 +327,11 @@ class CanvasPainter extends CustomPainter {
       currentScale >= _zoomThreshold && (strokeSize * currentScale) >= 3;
 
   static const _zoomThreshold = 0.9;
-  double _effectiveStrokeSize(Stroke stroke) {
-    if (stroke.toolId != .pen && stroke.toolId != .shapePen) {
-      return stroke.options.size;
-    }
-    return effectivePenSize(stroke.options.size, currentScale);
-  }
+  double _effectiveStrokeSize(Stroke stroke) => effectiveStrokeSize(
+    stroke.toolId,
+    stroke.options.size,
+    currentScale,
+  );
 
   Path _selectPath(Stroke stroke, {bool forceHighQuality = false}) {
     final quality = !forceHighQuality && currentScale < _zoomThreshold

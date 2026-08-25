@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:saber/components/canvas/_canvas_painter.dart';
 import 'package:saber/components/canvas/canvas_gesture_detector.dart';
 import 'package:saber/data/extensions/matrix4_extensions.dart';
+import 'package:sbn/tool_id.dart';
 
 void main() {
   const containerBounds = BoxConstraints(
@@ -96,5 +97,25 @@ void main() {
     expect(CanvasPainter.effectivePenSize(1, 1), 1.5);
     expect(CanvasPainter.effectivePenSize(1, 0.3), 5);
     expect(CanvasPainter.effectivePenSize(4, 1), 4);
+  });
+
+  test('Only drawing pens use the minimum screen-space width', () {
+    for (final toolId in [
+      ToolId.fountainPen,
+      ToolId.ballpointPen,
+      ToolId.shapePen,
+    ]) {
+      expect(CanvasPainter.effectiveStrokeSize(toolId, 1, 0.5), 3);
+    }
+
+    for (final toolId in ToolId.values.where(
+      (toolId) => !{
+        ToolId.fountainPen,
+        ToolId.ballpointPen,
+        ToolId.shapePen,
+      }.contains(toolId),
+    )) {
+      expect(CanvasPainter.effectiveStrokeSize(toolId, 1, 0.5), 1);
+    }
   });
 }
